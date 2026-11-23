@@ -1,0 +1,228 @@
+// OkvirPro – model podataka
+// Lokalno: SQLite. Za Supabase promeniti provider u "postgresql" i DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── Podešavanja firme (jedan red, id = 1) ─────────────
+model Firma {
+  id             Int     @id @default(1)
+  naziv          String  @default("")
+  adresa         String  @default("")
+  mesto          String  @default("")
+  pib            String  @default("")
+  maticniBroj    String  @default("")
+  email          String  @default("")
+  telefon        String  @default("")
+  web            String  @default("")
+  tekuciRacun    String  @default("")
+  zastupnik      String  @default("")
+  logo           String? // data URL ili putanja
+  marza          Float   @default(50)   // %
+  montazaPoM2    Float   @default(12)   // €
+  pdvStopa       Float   @default(20)   // %
+  kursEur        Float   @default(117.5)
+  okovMetoda     String  @default("DETALJNO") // DETALJNO | PAUSALNO
+  okovPoM2       Float   @default(0)
+  kalkulatorAktivan Boolean @default(true)
+  kalkulatorPoruka  String  @default("Hvala! Primili smo vaš upit i javićemo vam se u najkraćem roku sa konačnom ponudom.")
+  garancija      String  @default("")
+  uslovi         String  @default("") // jedna stavka po redu
+}
+
+// ───────────── Cenovnici: staklo, roletne, komarnici, daske, okapnice, rukohvati, dodaci vrata ─────────────
+model CenovnikStavka {
+  id         Int    @id @default(autoincrement())
+  kategorija String // STAKLO | ROLETNA | KOMARNIK | DASKA | OKAPNICA | RUKOHVAT | DODATAK_VRATA
+  naziv      String
+  cena       Float  @default(0)
+  redosled   Int    @default(0)
+}
+
+// ───────────── Profili ─────────────
+model ProfilSistem {
+  id        Int            @id @default(autoincrement())
+  naziv     String
+  tip       String         // PVC | ALU
+  redosled  Int            @default(0)
+  stavke    ProfilStavka[]
+  ponudaStavke PonudaStavka[]
+}
+
+model ProfilStavka {
+  id               Int          @id @default(autoincrement())
+  sistemId         Int
+  sistem           ProfilSistem @relation(fields: [sistemId], references: [id], onDelete: Cascade)
+  kljuc            String       // RAM | KRILO_PROZORA | KRILO_VRATA | CELIK_RAMA | CELIK_KRILA | CELIK_KRILA_VRATA | LAJSNA | PRECKA | LAZNA_PRECKA | PRAG | PROSIRENJE | PODSTOK | SPOJNICA_PRECKE | POKLOPAC_STULPA
+  naziv            String
+  duzinaSipke      Float?       // mm
+  unutrasnjaVisina Float?       // mm
+  sirinaOdbitak    Float?       // mm
+  cena             Float        @default(0) // €/m ili €/kom
+  poKomadu         Boolean      @default(false)
+  redosled         Int          @default(0)
+  puneSipke        Int          @default(0) // magacin
+  ostaci           Ostatak[]
+
+  @@unique([sistemId, kljuc])
+}
+
+model Ostatak {
+  id             Int          @id @default(autoincrement())
+  profilStavkaId Int
+  profilStavka   ProfilStavka @relation(fields: [profilStavkaId], references: [id], onDelete: Cascade)
+  duzina         Float        // mm
+  createdAt      DateTime     @default(now())
+}
+
+// ───────────── Boje profila (5 najčešćih) ─────────────
+model BojaProfila {
+  id       Int    @id @default(autoincrement())
+  sifra    String @unique
+  naziv    String
+  hex      String @default("#f6f6f1")
+  doplata  Float  @default(0) // % na nabavnu cenu profila (bez čelika)
+  redosled Int    @default(0)
+}
+
+// ───────────── Okov ─────────────
+model OkovStavka {
+  id       Int     @id @default(autoincrement())
+  grupa    String  // PSK | PROZOR | STULP | VRATA
+  kljuc    String  @unique
+  naziv    String
+  cena     Float   @default(0)
+  poMetru  Boolean @default(false)
+  redosled Int     @default(0)
+}
+
+// ───────────── Modeli (katalog) ─────────────
+model Model {
+  id         Int     @id @default(autoincrement())
+  sifra      String  @unique
+  naziv      String
+  kategorija String  // PROZOR | VRATA
+  definicija String  // JSON: struktura polja (fiks/krilo/podele)
+  korisnicki Boolean @default(false)
+  redosled   Int     @default(0)
+}
+
+// ───────────── Paneli ─────────────
+model Panel {
+  id       Int     @id @default(autoincrement())
+  sifra    String  @unique
+  naziv    String
+  cena     Float   @default(0) // sa PDV-om
+  slika    String?
+  redosled Int     @default(0)
+}
+
+// ───────────── Klijenti ─────────────
+model Klijent {
+  id          Int      @id @default(autoincrement())
+  naziv       String
+  tipLica     String   @default("FIZICKO") // FIZICKO | PRAVNO
+  adresa      String   @default("")
+  email       String   @default("")
+  telefon     String   @default("")
+  pib         String   @default("")
+  maticniBroj String   @default("")
+  createdAt   DateTime @default(now())
+  ponude      Ponuda[]
+}
+
+// ───────────── Ponude ─────────────
+model Ponuda {
+  id                Int            @id @default(autoincrement())
+  broj              String         @unique // P-2026-1234
+  klijentId         Int
+  klijent           Klijent        @relation(fields: [klijentId], references: [id])
+  status            String         @default("NACRT") // NACRT | POTVRDJENO | REALIZOVANO
+  izvor             String         @default("APLIKACIJA") // APLIKACIJA | SAJT (javni kalkulator)
+  pregledano        Boolean        @default(true)         // false = nov upit sa sajta
+  napomenaKupca     String         @default("")
+  rokIsporuke       DateTime?
+  bezPdv            Boolean        @default(false)
+  montazaUCenu      Boolean        @default(false)
+  bezMontaze        Boolean        @default(false)
+  // zamrznuti zbirovi (EUR)
+  ukupnoBezPdv      Float          @default(0)
+  pdv               Float          @default(0)
+  montaza           Float          @default(0)
+  ukupnoZaNaplatu   Float          @default(0)
+  trosakMaterijala  Float          @default(0)
+  // dokumenti
+  avans             Float?
+  avansDatum        DateTime?
+  racunBezPdv       Boolean        @default(false)
+  racunDatum        DateTime?
+  racunValutaDana   Int            @default(3)
+  realizovanoAt     DateTime?
+  utrosakProknjizen Boolean        @default(false)
+  krojnaLista       String?        // JSON snimak plana sečenja u trenutku knjiženja
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  stavke            PonudaStavka[]
+  reklamacije       Reklamacija[]
+}
+
+model PonudaStavka {
+  id            Int           @id @default(autoincrement())
+  ponudaId      Int
+  ponuda        Ponuda        @relation(fields: [ponudaId], references: [id], onDelete: Cascade)
+  redosled      Int           @default(0)
+  vrsta         String        // PROZOR | VRATA | ROLETNA | KOMARNIK | DASKA | OKAPNICA
+  sirina        Float         // mm
+  visina        Float         // mm
+  kolicina      Int           @default(1)
+  sistemId      Int?
+  sistem        ProfilSistem? @relation(fields: [sistemId], references: [id])
+  staklo        String?       // naziv iz cenovnika
+  materijal     String?       // za roletnu/komarnik/dasku/okapnicu
+  marza         Float         @default(50)
+  rucnaCena     Float?        // ako je ručni unos
+  modelSifra    String?
+  panelSifra    String?
+  rukohvat      String?       // naziv iz cenovnika RUKOHVAT
+  // dodaci uz prozor/vrata (naziv iz cenovnika, null = bez)
+  boja          String?       // šifra boje profila (BojaProfila.sifra); null = bela
+  roletna       String?
+  roletnaVisina Float?        // visina kutije roletne u mm (podrazumevano 180)
+  roletnaPrepust Float?       // prepust kutije roletne ka sobi u mm (podrazumevano 50)
+  roletnaKais   String?     // strana kaiša roletne gledano iznutra: L | D (podrazumevano D)
+  komarnik      String?
+  daska         String?
+  okapnica      String?
+  elektroPrihvatnik Boolean   @default(false)
+  automat       Boolean       @default(false)
+  podstok       Boolean       @default(false)
+  prosirenjeL   Boolean       @default(false)
+  prosirenjeD   Boolean       @default(false)
+  // mere opcija u mm; null = podrazumevana vrednost iz profilnog sistema
+  podstokMm     Float?
+  prosirenjeLMm Float?
+  prosirenjeDMm Float?
+  spojL         Boolean       @default(false)
+  spojD         Boolean       @default(false)
+  napomena      String        @default("")
+  cenaKom       Float         @default(0) // prodajna, bez PDV-a
+  trosakKom     Float         @default(0) // nabavna
+}
+
+// ───────────── Reklamacije ─────────────
+model Reklamacija {
+  id        Int      @id @default(autoincrement())
+  broj      String   @unique // REK-2026-1234
+  ponudaId  Int
+  ponuda    Ponuda   @relation(fields: [ponudaId], references: [id], onDelete: Cascade)
+  datum     DateTime @default(now())
+  opis      String
+  status    String   @default("OTVORENO") // OTVORENO | RESENO
+  resenje   String   @default("")
+}
