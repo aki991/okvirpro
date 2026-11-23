@@ -27,6 +27,7 @@ export function StavkaCrtez({ s, k, className }: { s: PonudaStavka; k: Kontekst;
         spojD: s.spojD,
         roletna: s.roletna,
         roletnaVisina: s.roletnaVisina,
+        roletnaPrepust: s.roletnaPrepust,
         roletnaKais: s.roletnaKais,
         komarnik: s.komarnik,
         daska: s.daska,

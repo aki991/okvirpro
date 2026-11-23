@@ -294,6 +294,7 @@ export function Kalkulator(p: Props) {
                   opcije={{
                     roletna: s.roletna,
                     roletnaVisina: s.roletnaVisina,
+                    roletnaPrepust: s.roletnaPrepust,
                     roletnaKais: s.roletnaKais,
                     komarnik: s.komarnik,
                     daska: s.daska,

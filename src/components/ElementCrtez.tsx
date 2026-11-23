@@ -1,9 +1,9 @@
 import type { Cvor } from "@/lib/modeli-katalog";
-import { ModelCrtez } from "./ModelCrtez";
-import { visinaRoletne } from "@/lib/proracun";
+import { prepustRoletne, visinaRoletne } from "@/lib/proracun";
+import { hes, jeDekor, mesaj, ProzorRealno, RealnoDefs } from "./ProzorRealno";
 
-// Veliki crtež pozicije u razmeri: model, proširenja, podštok, spoj, roletna, komarnik,
-// daska, okapnica – sa kotama (ukupne mere, lanci mera i podela polja).
+// Veliki crtež pozicije u razmeri – realističan prikaz gledano iznutra (profili, staklo, okov,
+// roletna sa kaišem i namotačem, daska, okapnica) sa kotama (ukupne mere, lanci mera i podela polja).
 
 export type ElementOpcije = {
   podstok?: boolean;
@@ -13,6 +13,8 @@ export type ElementOpcije = {
   spojD?: boolean;
   roletna?: string | null;
   roletnaVisina?: number | null;
+  /** prepust kutije ka sobi (mm) – vidi se kao senka ispod kutije */
+  roletnaPrepust?: number | null;
   /** strana kaiša gledano iznutra: "L" | "D" (podrazumevano D) */
   roletnaKais?: string | null;
   komarnik?: string | null;
@@ -23,13 +25,7 @@ export type ElementOpcije = {
 
 const BOJE = {
   kota: "#4b5552",
-  prosirenje: "#e9d2a6",
-  podstok: "#cfc6b4",
-  spoj: "#b4352b",
-  roletna: "#cfd3d1",
-  okapnica: "#6b7471",
-  daska: "#f1efe9",
-  oznaka: "#0f4c45",
+  roletna: "#dfe2e1",
 };
 
 function Kota({
@@ -66,20 +62,6 @@ function Kota({
 /** Pomoćne linije od elementa do kote. */
 function Pomocna({ x1, y1, x2, y2, u }: { x1: number; y1: number; x2: number; y2: number; u: number }) {
   return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={BOJE.kota} strokeWidth={0.12 * u} strokeDasharray={`${u} ${0.8 * u}`} />;
-}
-
-function Oznaka({ x, y, tekst, u, boja = BOJE.oznaka, anchor = "middle" }: { x: number; y: number; tekst: string; u: number; boja?: string; anchor?: "start" | "middle" | "end" }) {
-  const fs = 2.6 * u;
-  const w = tekst.length * fs * 0.62 + 2 * u;
-  const x0 = anchor === "middle" ? x - w / 2 : anchor === "end" ? x - w : x;
-  return (
-    <g>
-      <rect x={x0} y={y - fs * 0.85} width={w} height={fs * 1.3} rx={0.6 * u} fill="#ffffff" fillOpacity={0.9} stroke={boja} strokeWidth={0.15 * u} />
-      <text x={x0 + w / 2} y={y} fontSize={fs} fontWeight={700} fill={boja} textAnchor="middle" letterSpacing={0.1 * u}>
-        {tekst}
-      </text>
-    </g>
-  );
 }
 
 /** Mere polja na prvom nivou podele (osne mere, po udelima). */
@@ -167,116 +149,134 @@ export function ElementCrtez({
   const maxY = yKotaDole2 + 4 * u;
 
   const zaokr = (n: number) => String(Math.round(n));
-  const idPref = `e${Math.round(W)}x${Math.round(H)}`;
+  // id-jevi definicija: zavise od mera i modela (clipPath stakla), ne od boje
+  const idPref = `e${Math.round(W)}x${Math.round(H)}${hes(JSON.stringify([definicija, prL, prD, pod, vrsta]))}`;
+  const prof = boja ?? "#f5f5f1";
+  const dekor = profilna && jeDekor(boja);
+  const tanka = 0.06 * u;
+
+  // ── samostalne stavke (bez profila): roletna, komarnik, daska, okapnica ──
+  const samostalna = () => {
+    if (vrsta === "ROLETNA") {
+      const bh = Math.min(H * 0.2, 200); // kutija
+      return (
+        <g>
+          <rect x={16} y={bh} width={W - 32} height={H - bh} fill={BOJE.roletna} />
+          <rect x={16} y={bh} width={W - 32} height={H - bh} fill={`url(#${idPref}-lamele)`} />
+          <rect x={16} y={H - 44} width={W - 32} height={44} fill={`url(#${idPref}-alu)`} stroke="#000" strokeOpacity={0.25} strokeWidth={tanka} />
+          {[0, W - 26].map((x) => (
+            <rect key={x} x={x} y={bh} width={26} height={H - bh} fill={`url(#${idPref}-alu)`} stroke="#000" strokeOpacity={0.25} strokeWidth={tanka} />
+          ))}
+          <rect x={0} y={0} width={W} height={bh} fill={BOJE.roletna} />
+          <rect x={0} y={0} width={W} height={bh} fill={`url(#${idPref}-ploca-y)`} stroke="#000" strokeOpacity={0.3} strokeWidth={tanka} />
+        </g>
+      );
+    }
+    if (vrsta === "KOMARNIK") {
+      const r = { x: 0, y: 0, w: W, h: H };
+      const t = 25;
+      return (
+        <g>
+          <rect x={t} y={t} width={W - 2 * t} height={H - 2 * t} fill="#dfe6e8" fillOpacity={0.5} />
+          <rect x={t} y={t} width={W - 2 * t} height={H - 2 * t} fill={`url(#${idPref}-mreza)`} />
+          <path
+            d={`M${r.x} ${r.y}H${W}V${H}H0Z M${t} ${t}V${H - t}H${W - t}V${t}Z`}
+            fill="#d6dbdb"
+            fillRule="evenodd"
+            stroke="#000"
+            strokeOpacity={0.3}
+            strokeWidth={tanka}
+          />
+          <path d={`M${r.x} ${r.y}H${W}V${H}H0Z M${t} ${t}V${H - t}H${W - t}V${t}Z`} fill={`url(#${idPref}-ploca-y)`} fillRule="evenodd" />
+        </g>
+      );
+    }
+    return <rect x={0} y={0} width={W} height={H} fill={`url(#${idPref}-${vrsta === "OKAPNICA" ? "alu" : "mermer"})`} stroke="#000" strokeOpacity={0.3} strokeWidth={tanka} />;
+  };
+
+  // namotač kaiša: na istoj visini kao u 3D prikazu
+  const yNamotac = H - (pod + Math.max(140, Math.min(950, (H - pod) * 0.42)));
+  const xKais = opcije.roletnaKais === "L" ? 12 : W - 12;
+  const senkaKutije = 6 + prepustRoletne(opcije.roletnaPrepust) * 0.5;
 
   return (
     <svg viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`} className={className} role="img" aria-label={`${vrsta} ${sirina}×${visina} mm`}>
       <defs>
-        <pattern id={`${idPref}-sraf`} width={2 * u} height={2 * u} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1={0} y1={0} x2={0} y2={2 * u} stroke="#a07a3a" strokeWidth={0.25 * u} strokeOpacity={0.55} />
-        </pattern>
-        <pattern id={`${idPref}-mreza`} width={1.4 * u} height={1.4 * u} patternUnits="userSpaceOnUse">
-          <path d={`M0 0 H${1.4 * u} M0 0 V${1.4 * u}`} stroke="#3d4a47" strokeWidth={0.1 * u} strokeOpacity={0.45} fill="none" />
-        </pattern>
-        <pattern id={`${idPref}-lamele`} width={W} height={1.6 * u} patternUnits="userSpaceOnUse">
-          <line x1={0} y1={1.6 * u} x2={W} y2={1.6 * u} stroke="#9aa29f" strokeWidth={0.15 * u} />
-        </pattern>
+        <RealnoDefs id={idPref} u={u} />
       </defs>
 
-      {/* ── Sam element ── */}
+      {/* ── Sam element (gledano iznutra) ── */}
       {profilna ? (
-        <ModelCrtez definicija={definicija!} sirina={fw} visina={fh} pad={0} boja={boja} polozaj={{ x: prL, y: 0, width: fw, height: fh }} />
+        <ProzorRealno
+          id={idPref}
+          u={u}
+          definicija={definicija!}
+          W={W}
+          H={H}
+          mere={{ prosirenjeL: prL, prosirenjeD: prD, podstok: pod }}
+          boja={boja}
+          komarnik={!!opcije.komarnik}
+          panel={opcije.panel}
+          vrsta={vrsta}
+        />
       ) : (
-        <g>
-          <rect x={0} y={0} width={W} height={H} fill={vrsta === "ROLETNA" ? BOJE.roletna : vrsta === "OKAPNICA" ? BOJE.okapnica : "#f6f6f4"} stroke="#2f3a38" strokeWidth={0.35 * u} />
-          {vrsta === "ROLETNA" && <rect x={0} y={0} width={W} height={H} fill={`url(#${idPref}-lamele)`} />}
-          {vrsta === "KOMARNIK" && <rect x={2 * u} y={2 * u} width={W - 4 * u} height={H - 4 * u} fill={`url(#${idPref}-mreza)`} stroke="#2f3a38" strokeWidth={0.2 * u} />}
-          <Oznaka x={W / 2} y={H / 2 + u} tekst={vrsta} u={u} />
-        </g>
-      )}
-
-      {/* Proširenja */}
-      {prL > 0 && (
-        <g>
-          <rect x={0} y={0} width={prL} height={fh} fill={boja ?? BOJE.prosirenje} stroke="#8a6a3b" strokeWidth={0.2 * u} />
-          <rect x={0} y={0} width={prL} height={fh} fill={`url(#${idPref}-sraf)`} />
-        </g>
-      )}
-      {prD > 0 && (
-        <g>
-          <rect x={W - prD} y={0} width={prD} height={fh} fill={boja ?? BOJE.prosirenje} stroke="#8a6a3b" strokeWidth={0.2 * u} />
-          <rect x={W - prD} y={0} width={prD} height={fh} fill={`url(#${idPref}-sraf)`} />
-        </g>
-      )}
-      {/* Podštok */}
-      {pod > 0 && (
-        <g>
-          <rect x={0} y={fh} width={W} height={pod} fill={BOJE.podstok} stroke="#7d7360" strokeWidth={0.2 * u} />
-          <rect x={0} y={fh} width={W} height={pod} fill={`url(#${idPref}-sraf)`} />
-        </g>
-      )}
-
-      {/* Komarnik preko ostakljenja */}
-      {profilna && opcije.komarnik && (
-        <g>
-          <rect x={prL + 4 * u} y={4 * u} width={fw - 8 * u} height={fh - 8 * u} fill={`url(#${idPref}-mreza)`} stroke="#3d4a47" strokeWidth={0.15 * u} strokeDasharray={`${u} ${0.6 * u}`} />
-          <Oznaka x={prL + fw / 2} y={fh - 7 * u} tekst={`KOMARNIK`} u={u} boja="#3d4a47" />
-        </g>
+        samostalna()
       )}
 
       {/* Roletna (kutija iznad) */}
       {rolH > 0 && (
         <g>
-          {/* roletna prati boju prozora */}
-          <rect x={0} y={-rolH} width={W} height={rolH} fill={boja ?? BOJE.roletna} stroke="#2f3a38" strokeWidth={0.3 * u} />
-          <rect x={0} y={-rolH} width={W} height={rolH} fill={`url(#${idPref}-lamele)`} />
-          <Oznaka x={W / 2} y={-rolH / 2 + u} tekst="ROLETNA" u={u} boja="#2f3a38" />
-          {/* kaiš i namotač (gledano iznutra) na izabranoj strani */}
-          {(() => {
-            const xk = opcije.roletnaKais === "L" ? 1.6 * u : W - 1.6 * u;
-            const yn = fh * 0.55;
-            return (
-              <g>
-                <line x1={xk} y1={0} x2={xk} y2={yn} stroke="#a59e8e" strokeWidth={0.9 * u} />
-                <rect x={xk - 1.3 * u} y={yn} width={2.6 * u} height={8 * u} rx={0.6 * u} fill="#f6f6f3" stroke="#2f3a38" strokeWidth={0.18 * u} />
-                <Oznaka x={opcije.roletnaKais === "L" ? xk + 2 * u : xk - 2 * u} y={yn + 4.5 * u} tekst="KAIŠ" u={u * 0.8} boja="#2f3a38" anchor={opcije.roletnaKais === "L" ? "start" : "end"} />
-              </g>
-            );
-          })()}
+          {/* nadgradna kutija gledano iznutra – unutrašnje lice u boji prozora; prepust baca senku na štok */}
+          <rect x={0} y={0} width={W} height={senkaKutije} fill={`url(#${idPref}-senka-dole)`} />
+          <rect x={0} y={-rolH} width={W} height={rolH} fill={prof} filter={dekor ? `url(#${idPref}-drvoH)` : undefined} />
+          <rect x={0} y={-rolH} width={W} height={rolH} fill={`url(#${idPref}-ploca-y)`} />
+          {/* donja ivica revizionog poklopca i bočne kape */}
+          <rect x={0} y={-12} width={W} height={12} fill="#000" fillOpacity={0.06} />
+          <line x1={6} y1={-12} x2={W - 6} y2={-12} stroke="#000" strokeOpacity={0.28} strokeWidth={tanka * 1.5} />
+          <rect x={0} y={-rolH - 2} width={5} height={rolH + 2} fill={mesaj(prof, "#000000", 0.18)} />
+          <rect x={W - 5} y={-rolH - 2} width={5} height={rolH + 2} fill={mesaj(prof, "#000000", 0.18)} />
+          <rect x={0} y={-rolH} width={W} height={rolH} fill="none" stroke="#000" strokeOpacity={0.3} strokeWidth={tanka} />
+
+          {/* kaiš (sivo-bež traka) od uvodnika do namotača */}
+          <g filter={`url(#${idPref}-senka)`}>
+            <rect x={xKais - 8} y={0} width={16} height={Math.max(0, yNamotac - 85)} fill={`url(#${idPref}-kais)`} stroke="#000" strokeOpacity={0.2} strokeWidth={tanka} />
+            {/* uvodnik sa četkicama */}
+            <rect x={xKais - 15} y={-1} width={30} height={9} rx={2} fill={`url(#${idPref}-metal)`} stroke="#000" strokeOpacity={0.25} strokeWidth={tanka} />
+            {/* namotač */}
+            <rect x={xKais - 20} y={yNamotac - 85} width={40} height={170} rx={7} fill={`url(#${idPref}-metal)`} stroke="#000" strokeOpacity={0.28} strokeWidth={tanka} />
+            <rect x={xKais - 16} y={yNamotac - 80} width={32} height={160} rx={5} fill="#fff" fillOpacity={0.55} stroke="#000" strokeOpacity={0.12} strokeWidth={tanka} />
+            <rect x={xKais - 9} y={yNamotac - 84} width={18} height={3} rx={1} fill="#2a2e30" />
+            <circle cx={xKais} cy={yNamotac + 56} r={6} fill="#5b6163" />
+          </g>
         </g>
       )}
 
-      {/* Spoj */}
-      {profilna && opcije.spojL && (
-        <g>
-          <line x1={0} y1={-rolH} x2={0} y2={H} stroke={BOJE.spoj} strokeWidth={1.1 * u} />
-          <Oznaka x={1.5 * u} y={4 * u} tekst="SPOJ" u={u} boja={BOJE.spoj} anchor="start" />
-        </g>
-      )}
-      {profilna && opcije.spojD && (
-        <g>
-          <line x1={W} y1={-rolH} x2={W} y2={H} stroke={BOJE.spoj} strokeWidth={1.1 * u} />
-          <Oznaka x={W - 1.5 * u} y={4 * u} tekst="SPOJ" u={u} boja={BOJE.spoj} anchor="end" />
-        </g>
-      )}
+      {/* Spoj: spojni profil uz ivicu */}
+      {profilna &&
+        [opcije.spojL && 0, opcije.spojD && W - 12].filter((x): x is number => typeof x === "number").map((x) => (
+          <g key={`sp${x}`}>
+            <rect x={x} y={-rolH} width={12} height={H + rolH} fill={prof} />
+            <rect x={x} y={-rolH} width={12} height={H + rolH} fill={`url(#${idPref}-precka-x)`} stroke="#000" strokeOpacity={0.35} strokeWidth={tanka} />
+          </g>
+        ))}
 
-      {/* Okapnica i daska */}
+      {/* Okapnica (aluminijum) i unutrašnja daska */}
       {trake.map((t) =>
         t.tip === "okapnica" ? (
-          <g key="o">
-            <path d={`M${-2 * u} ${t.y} H${W + 2 * u} L${W + 2 * u} ${t.y + traka * 0.6} L${-2 * u} ${t.y + traka}Z`} fill={BOJE.okapnica} />
-            <Oznaka x={W / 2} y={t.y + traka * 0.75} tekst="OKAPNICA" u={u * 0.85} boja="#2f3a38" />
-          </g>
+          <path
+            key="o"
+            d={`M${-2 * u} ${t.y} H${W + 2 * u} L${W + 2 * u} ${t.y + traka * 0.6} L${-2 * u} ${t.y + traka}Z`}
+            fill={`url(#${idPref}-alu)`}
+            stroke="#000"
+            strokeOpacity={0.3}
+            strokeWidth={tanka}
+          />
         ) : (
-          <g key="d">
-            <rect x={-1.2 * u} y={t.y} width={W + 2.4 * u} height={traka} fill={BOJE.daska} stroke="#8b8f8a" strokeWidth={0.18 * u} strokeDasharray={`${u} ${0.6 * u}`} />
-            <Oznaka x={W / 2} y={t.y + traka * 0.8} tekst="DASKA" u={u * 0.85} boja="#5b605c" />
+          <g key="d" filter={`url(#${idPref}-senka)`}>
+            <rect x={-1.2 * u} y={t.y} width={W + 2.4 * u} height={traka} rx={0.3 * u} fill={`url(#${idPref}-mermer)`} stroke="#000" strokeOpacity={0.22} strokeWidth={tanka} />
           </g>
         ),
       )}
-
-      {/* Panel na vratima */}
-      {profilna && opcije.panel && <Oznaka x={prL + fw / 2} y={fh * 0.55} tekst={`PANEL ${opcije.panel}`} u={u} />}
 
       {/* ── Kote ── */}
       {/* širina: lanac (proširenja + ram) i ukupno */}
