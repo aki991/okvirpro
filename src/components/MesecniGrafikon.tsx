@@ -45,17 +45,17 @@ export function MesecniGrafikon({ podaci, serije = ["prihod", "zarada"] }: { pod
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-              <th className="py-1.5 font-semibold">Mesec</th>
-              <th className="py-1.5 text-right font-semibold">Ponuda</th>
-              {serije.map((s) => <th key={s} className="py-1.5 text-right font-semibold">{def[s].n}</th>)}
+              <th className="py-1.5 text-left font-semibold">Mesec</th>
+              <th className="py-1.5 font-semibold">Ponuda</th>
+              {serije.map((s) => <th key={s} className="py-1.5 font-semibold">{def[s].n}</th>)}
             </tr>
           </thead>
           <tbody>
             {podaci.map((m) => (
               <tr key={m.kljuc} className="border-b border-line/60">
-                <td className="py-1.5">{m.naziv}</td>
-                <td className="py-1.5 text-right">{m.broj}</td>
-                {serije.map((s) => <td key={s} className="py-1.5 text-right font-semibold">{fmt(m[s])}</td>)}
+                <td className="py-1.5 text-left">{m.naziv}</td>
+                <td className="py-1.5 tabular-nums">{m.broj}</td>
+                {serije.map((s) => <td key={s} className="py-1.5 font-semibold tabular-nums">{fmt(m[s])}</td>)}
               </tr>
             ))}
           </tbody>

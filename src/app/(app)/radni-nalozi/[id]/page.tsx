@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Package, Scissors, Shield, SquareStack, StickyNote } from "lucide-react";
+import { Package, PackageCheck, Scissors, Shield, SquareStack, StickyNote } from "lucide-react";
 import { ucitajProizvodnju } from "@/lib/proizvodnja";
 import { opisStavke, VRSTE } from "@/lib/proracun";
 import { izBaze, profilnaVrsta } from "@/lib/stavka";
@@ -24,7 +25,7 @@ function Tabela({ naslov, ikona: Ikona, redovi, kolone }: { naslov: string; ikon
         <thead>
           <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
             {kolone.map((k, i) => (
-              <th key={k} className={`py-1 font-semibold ${i > 0 ? "text-right" : ""}`}>{k}</th>
+              <th key={k} className={`py-1 font-semibold ${i === 0 ? "text-left" : ""}`}>{k}</th>
             ))}
           </tr>
         </thead>
@@ -32,7 +33,7 @@ function Tabela({ naslov, ikona: Ikona, redovi, kolone }: { naslov: string; ikon
           {redovi.map((r, i) => (
             <tr key={i} className="border-b border-line/50 last:border-0">
               {r.map((c, j) => (
-                <td key={j} className={`py-1 ${j > 0 ? "text-right font-mono font-semibold" : ""}`}>{c}</td>
+                <td key={j} className={`py-1 ${j > 0 ? "font-semibold tabular-nums" : "text-left"}`}>{c}</td>
               ))}
             </tr>
           ))}
@@ -56,6 +57,9 @@ export default async function RadniNalog({ params }: { params: Promise<{ id: str
         akcije={
           <>
             <NazadDugme href="/radni-nalozi" />
+            <Link href={`/trebovanje/${ponuda.id}`} className="btn-secondary">
+              <PackageCheck size={16} /> Trebovanje
+            </Link>
             <StampajDugme label="Štampaj nalog" />
           </>
         }

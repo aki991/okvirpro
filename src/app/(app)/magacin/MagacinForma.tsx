@@ -46,7 +46,7 @@ export function MagacinForma({ sistemi }: { sistemi: Sistem[] }) {
             <table className="w-full min-w-[600px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-5 py-2 font-semibold">Profil</th>
+                  <th className="px-5 py-2 text-left font-semibold">Profil</th>
                   <th className="px-3 py-2 font-semibold">Šipka</th>
                   <th className="w-32 px-3 py-2 font-semibold">Pune šipke</th>
                   <th className="px-3 py-2 font-semibold">Ostaci (&gt;{MIN_OSTATAK} mm)</th>
@@ -58,11 +58,11 @@ export function MagacinForma({ sistemi }: { sistemi: Sistem[] }) {
                   const negativno = (broj(v.pune) ?? 0) < 0;
                   return (
                     <tr key={p.id} className="border-b border-line/60 align-top last:border-0">
-                      <td className="px-5 py-2.5 font-medium">{p.naziv}</td>
-                      <td className="px-3 py-2.5 font-mono text-muted">{p.duzinaSipke}</td>
+                      <td className="px-5 py-2.5 text-left font-medium">{p.naziv}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-muted">{p.duzinaSipke}</td>
                       <td className="px-3 py-2">
                         <input
-                          className={`input !py-1.5 text-right font-semibold ${negativno ? "!border-danger text-danger" : ""}`}
+                          className={`input !py-1.5 text-center font-semibold ${negativno ? "!border-danger text-danger" : ""}`}
                           inputMode="numeric"
                           value={v.pune}
                           onChange={(e) => izmeni(p.id, { pune: e.target.value })}
@@ -74,7 +74,7 @@ export function MagacinForma({ sistemi }: { sistemi: Sistem[] }) {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
                           {v.ostaci.length === 0 && <span className="text-xs text-muted">Nema ostataka</span>}
                           {v.ostaci.map((o, i) => (
                             <span key={o.id ?? `n${i}`} className="inline-flex items-center gap-1 rounded-md bg-accent-soft px-2 py-0.5 font-mono text-xs font-semibold text-accent">

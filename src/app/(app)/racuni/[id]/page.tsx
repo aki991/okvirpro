@@ -96,25 +96,25 @@ export default async function Racun({ params }: { params: Promise<{ id: string }
             <thead>
               <tr className="border-y border-line bg-background text-left text-[11px] uppercase tracking-wide text-muted">
                 <th className="px-2 py-2 font-semibold">#</th>
-                <th className="px-2 py-2 font-semibold">Naziv proizvoda / opis</th>
-                <th className="px-2 py-2 text-center font-semibold">J.m.</th>
-                <th className="px-2 py-2 text-center font-semibold">Kol.</th>
-                <th className="px-2 py-2 text-right font-semibold">Cena (RSD)</th>
-                <th className="px-2 py-2 text-right font-semibold">Osnovica (RSD)</th>
+                <th className="px-2 py-2 text-left font-semibold">Naziv proizvoda / opis</th>
+                <th className="px-2 py-2 font-semibold">J.m.</th>
+                <th className="px-2 py-2 font-semibold">Kol.</th>
+                <th className="px-2 py-2 font-semibold">Cena (RSD)</th>
+                <th className="px-2 py-2 font-semibold">Osnovica (RSD)</th>
               </tr>
             </thead>
             <tbody>
               {redovi.map((r, i) => (
                 <tr key={i} className="border-b border-line/60 align-top">
                   <td className="px-2 py-2">{i + 1}.</td>
-                  <td className="px-2 py-2">
+                  <td className="px-2 py-2 text-left">
                     <p className="font-semibold uppercase">{r.naslov}</p>
                     {r.detalji && <p className="text-xs text-muted">{r.detalji}</p>}
                   </td>
-                  <td className="px-2 py-2 text-center">{r.jm}</td>
-                  <td className="px-2 py-2 text-center">{r.kol}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right">{din(r.cena)}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right font-semibold">{din(r.osnovica)}</td>
+                  <td className="px-2 py-2">{r.jm}</td>
+                  <td className="px-2 py-2 tabular-nums">{r.kol}</td>
+                  <td className="whitespace-nowrap px-2 py-2 tabular-nums">{din(r.cena)}</td>
+                  <td className="whitespace-nowrap px-2 py-2 font-semibold tabular-nums">{din(r.osnovica)}</td>
                 </tr>
               ))}
             </tbody>

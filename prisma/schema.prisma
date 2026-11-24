@@ -94,7 +94,7 @@ model BojaProfila {
 // ───────────── Okov ─────────────
 model OkovStavka {
   id       Int     @id @default(autoincrement())
-  grupa    String  // PSK | PROZOR | STULP | VRATA
+  grupa    String  // PSK | PROZOR | KIP | STULP | VRATA
   kljuc    String  @unique
   naziv    String
   cena     Float   @default(0)

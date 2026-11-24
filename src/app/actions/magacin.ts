@@ -17,6 +17,8 @@ export async function proknjiziUtrosak(ponudaId: number) {
 
   await db.$transaction(async (tx) => {
     for (const pr of plan) {
+      // magacin vodi samo bele profile; profil u boji se poručuje posebno za nalog
+      if (pr.bojaSifra) continue;
       if (pr.punihSipki) await tx.profilStavka.update({ where: { id: pr.profilStavkaId }, data: { puneSipke: { decrement: pr.punihSipki } } });
       const iskorisceni = pr.sipke.filter((s) => s.izvor === "OSTATAK").map((s) => s.ostatakId!);
       if (iskorisceni.length) {

@@ -9,6 +9,7 @@ import { broj } from "@/lib/format";
 
 const GRUPE = [
   { grupa: "PROZOR", naslov: "Prozorski okov (okretno-nagibni)", opis: "Elementi za standardno krilo. Stavke „po m“ množe se obimom ili visinom krila.", samoDetaljno: true },
+  { grupa: "KIP", naslov: "Kip krilo (nadsvetlo)", opis: "Dodatni elementi za krilo koje se otvara samo na kip (ostalo se uzima iz prozorskog okova).", samoDetaljno: true },
   { grupa: "STULP", naslov: "Pomoćno krilo (štulp)", opis: "Dodatni elementi za dvokrilne prozore bez stuba.", samoDetaljno: true },
   { grupa: "PSK", naslov: "PSK klizni sistemi", opis: "Cena kompletnog PSK mehanizma za jedno klizno krilo.", samoDetaljno: false },
   { grupa: "VRATA", naslov: "Okov za vrata (glavno krilo)", opis: "Bravarija za ulazna i balkonska vrata.", samoDetaljno: false },

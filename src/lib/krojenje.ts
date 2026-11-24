@@ -24,8 +24,13 @@ export type Sipka = {
 };
 export type PlanProfila = {
   profilStavkaId: number;
+  /** ključ profila u sistemu (RAM, CELIK_RAMA…); nema ga u starim proknjiženim planovima */
+  kljuc?: string;
   sistem: string;
   profil: string;
+  /** boja profila (dekor) – prazno = beli profil iz magacina */
+  bojaSifra?: string;
+  boja?: string;
   duzinaSipke: number;
   sipke: Sipka[];
   punihSipki: number;

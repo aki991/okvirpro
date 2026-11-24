@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Tabele: zaglavlje i sadržaj svake kolone su centrirani; kolone sa nazivom/opisom
+   dobijaju „text-left“ (utility klase imaju prednost nad baznim slojem). */
+@layer base {
+  th,
+  td {
+    text-align: center;
+  }
+}
+
 /* OkvirPro – paleta: tamni teget-zeleni okvir + topli akcenat (boja drveta/mesinga) */
 :root {
   --background: #f5f4f0;

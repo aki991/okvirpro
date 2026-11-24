@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ClipboardList, FileSignature, Globe, Pencil, Receipt, Scissors } from "lucide-react";
+import { ClipboardList, FileSignature, Globe, PackageCheck, Pencil, Receipt, Scissors } from "lucide-react";
 import { db } from "@/lib/db";
 import { ucitajKontekst } from "@/lib/kontekst";
 import { opisStavke, type StavkaUlaz, type Vrsta } from "@/lib/proracun";
@@ -65,6 +65,7 @@ export default async function PrikazPonude({ params }: { params: Promise<{ id: s
             {[
               { href: `/radni-nalozi/${ponuda.id}`, n: "Radni nalog", i: ClipboardList },
               { href: `/krojne-liste/${ponuda.id}`, n: "Krojna lista", i: Scissors },
+              { href: `/trebovanje/${ponuda.id}`, n: "Trebovanje", i: PackageCheck },
               { href: `/avansi/${ponuda.id}`, n: "Ugovor o avansu", i: FileSignature },
               { href: `/racuni/${ponuda.id}`, n: "Račun", i: Receipt },
             ].map((d) => (
@@ -102,10 +103,10 @@ export default async function PrikazPonude({ params }: { params: Promise<{ id: s
             <thead>
               <tr className="border-y border-line bg-background text-left text-xs uppercase tracking-wide text-muted">
                 <th className="px-2 py-2 font-semibold">#</th>
-                <th className="px-2 py-2 font-semibold">Opis stavke</th>
-                <th className="px-2 py-2 text-center font-semibold">Kol.</th>
-                <th className="px-2 py-2 text-right font-semibold">Cena/kom</th>
-                <th className="px-2 py-2 text-right font-semibold">Ukupno</th>
+                <th className="px-2 py-2 text-left font-semibold">Opis stavke</th>
+                <th className="px-2 py-2 font-semibold">Kol.</th>
+                <th className="px-2 py-2 font-semibold">Cena/kom</th>
+                <th className="px-2 py-2 font-semibold">Ukupno</th>
               </tr>
             </thead>
             <tbody>
@@ -115,7 +116,7 @@ export default async function PrikazPonude({ params }: { params: Promise<{ id: s
                 return (
                   <tr key={s.id} className="break-inside-avoid border-b border-line/70 align-top">
                     <td className="px-2 py-3 font-semibold">{i + 1}.</td>
-                    <td className="px-2 py-3">
+                    <td className="px-2 py-3 text-left">
                       <div className="flex flex-col gap-4 sm:flex-row">
                         <div className="w-full shrink-0 sm:w-48">
                           <StavkaCrtez s={s} k={k} className="h-auto max-h-56 w-full" />
@@ -135,9 +136,9 @@ export default async function PrikazPonude({ params }: { params: Promise<{ id: s
                         </div>
                       </div>
                     </td>
-                    <td className="px-2 py-3 text-center">{s.kolicina}</td>
-                    <td className="whitespace-nowrap px-2 py-3 text-right">{eur(s.cenaKom)}</td>
-                    <td className="whitespace-nowrap px-2 py-3 text-right font-semibold">{eur(s.cenaKom * s.kolicina)}</td>
+                    <td className="px-2 py-3 tabular-nums">{s.kolicina}</td>
+                    <td className="whitespace-nowrap px-2 py-3 tabular-nums">{eur(s.cenaKom)}</td>
+                    <td className="whitespace-nowrap px-2 py-3 font-semibold tabular-nums">{eur(s.cenaKom * s.kolicina)}</td>
                   </tr>
                 );
               })}

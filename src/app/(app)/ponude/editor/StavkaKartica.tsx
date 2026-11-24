@@ -440,17 +440,17 @@ export function StavkaKartica({
                 <tbody>
                   {r.troskovi.map((t, i) => (
                     <tr key={i} className="border-b border-line/60 last:border-0">
-                      <td className="py-1 text-muted">{t.naziv}</td>
-                      <td className="py-1 text-right">{eur(t.iznos)}</td>
+                      <td className="py-1 text-left text-muted">{t.naziv}</td>
+                      <td className="py-1 tabular-nums">{eur(t.iznos)}</td>
                     </tr>
                   ))}
                   <tr className="font-semibold">
-                    <td className="pt-2">Ukupno nabavna</td>
-                    <td className="pt-2 text-right">{eur(r.trosakKom)}</td>
+                    <td className="pt-2 text-left">Ukupno nabavna</td>
+                    <td className="pt-2 tabular-nums">{eur(r.trosakKom)}</td>
                   </tr>
                   <tr className="font-semibold text-brand">
-                    <td>Prodajna (bez PDV-a)</td>
-                    <td className="text-right">{eur(r.cenaKom)}</td>
+                    <td className="text-left">Prodajna (bez PDV-a)</td>
+                    <td className="tabular-nums">{eur(r.cenaKom)}</td>
                   </tr>
                 </tbody>
               </table>

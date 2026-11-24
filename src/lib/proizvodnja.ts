@@ -21,13 +21,15 @@ export type Proizvodnja = NonNullable<Awaited<ReturnType<typeof ucitajProizvodnj
 
 /** Pravi plan sečenja za celu ponudu, koristeći trenutno stanje ostataka u magacinu. */
 export async function napraviPlan(p: Proizvodnja): Promise<PlanProfila[]> {
-  // komadi po (sistem, ključ profila)
-  const grupe = new Map<string, { sistemId: number; kljuc: string; komadi: Komad[] }>();
+  // komadi po (sistem, ključ profila, boja) – profil u boji (dekor folija) je drugi artikal i ne sme
+  // da se seče iz iste šipke kao beli; čelik nema boju
+  const grupe = new Map<string, { sistemId: number; kljuc: string; boja: string; komadi: Komad[] }>();
   for (const { s, poz, r } of p.pozicije) {
     if (!profilnaVrsta(s.vrsta) || !s.sistemId) continue;
     for (const rez of [...r.rezovi, ...r.celik]) {
-      const kljuc = `${s.sistemId}|${rez.kljuc}`;
-      if (!grupe.has(kljuc)) grupe.set(kljuc, { sistemId: s.sistemId, kljuc: rez.kljuc, komadi: [] });
+      const boja = rez.kljuc.startsWith("CELIK") || !s.boja || s.boja === "BELA" ? "" : s.boja;
+      const kljuc = `${s.sistemId}|${rez.kljuc}|${boja}`;
+      if (!grupe.has(kljuc)) grupe.set(kljuc, { sistemId: s.sistemId, kljuc: rez.kljuc, boja, komadi: [] });
       const oznaka = `P${poz}${rez.oznaka.replace(/^P\d+/, "")}`;
       for (let n = 0; n < rez.kom * s.kolicina; n++) grupe.get(kljuc)!.komadi.push({ oznaka, mera: rez.mera, ugao: rez.ugao });
     }
@@ -41,21 +43,31 @@ export async function napraviPlan(p: Proizvodnja): Promise<PlanProfila[]> {
 
   const planovi: PlanProfila[] = [];
   for (const pr of profili) {
-    const g = grupe.get(`${pr.sistemId}|${pr.kljuc}`);
-    if (!g || !pr.duzinaSipke) continue;
-    const { sipke, greska } = optimizuj(g.komadi, pr.duzinaSipke, pr.ostaci.filter((o) => o.duzina >= MIN_OSTATAK));
-    planovi.push({
-      profilStavkaId: pr.id,
-      sistem: pr.sistem.naziv,
-      profil: pr.naziv,
-      duzinaSipke: pr.duzinaSipke,
-      sipke,
-      punihSipki: sipke.filter((s) => s.izvor === "NOVA").length,
-      iskoriscenihOstataka: sipke.filter((s) => s.izvor === "OSTATAK").length,
-      metara: Math.round(g.komadi.reduce((a, k) => a + k.mera, 0)) / 1000,
-      otpad: sipke.reduce((a, s) => a + (s.ostatak < MIN_OSTATAK ? s.ostatak : 0), 0),
-      greska,
-    });
+    // bela grupa prva, pa boje redom kako su u podešavanjima
+    const svojeGrupe = [...grupe.values()]
+      .filter((g) => g.sistemId === pr.sistemId && g.kljuc === pr.kljuc)
+      .sort((a, b) => (a.boja === "" ? -1 : b.boja === "" ? 1 : p.k.boje.findIndex((x) => x.sifra === a.boja) - p.k.boje.findIndex((x) => x.sifra === b.boja)));
+    for (const g of svojeGrupe) {
+      if (!pr.duzinaSipke) continue;
+      // magacin (pune šipke i ostaci) vodi bele profile – profil u boji se uvek seče iz novih šipki
+      const ostaci = g.boja ? [] : pr.ostaci.filter((o) => o.duzina >= MIN_OSTATAK);
+      const { sipke, greska } = optimizuj(g.komadi, pr.duzinaSipke, ostaci);
+      planovi.push({
+        profilStavkaId: pr.id,
+        kljuc: pr.kljuc,
+        sistem: pr.sistem.naziv,
+        profil: pr.naziv,
+        bojaSifra: g.boja || undefined,
+        boja: g.boja ? p.k.boje.find((x) => x.sifra === g.boja)?.naziv ?? g.boja : undefined,
+        duzinaSipke: pr.duzinaSipke,
+        sipke,
+        punihSipki: sipke.filter((s) => s.izvor === "NOVA").length,
+        iskoriscenihOstataka: sipke.filter((s) => s.izvor === "OSTATAK").length,
+        metara: Math.round(g.komadi.reduce((a, k) => a + k.mera, 0)) / 1000,
+        otpad: sipke.reduce((a, s) => a + (s.ostatak < MIN_OSTATAK ? s.ostatak : 0), 0),
+        greska,
+      });
+    }
   }
   return planovi;
 }

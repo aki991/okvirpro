@@ -17,6 +17,7 @@ import {
   ClipboardList,
   ShoppingCart,
   Scissors,
+  PackageCheck,
   Warehouse,
   Receipt,
   Settings,
@@ -49,6 +50,7 @@ const SIFARNICI: Stavka[] = [
 const PROIZVODNJA: Stavka[] = [
   { href: "/radni-nalozi", naziv: "Radni nalozi", ikona: ClipboardList },
   { href: "/krojne-liste", naziv: "Krojne liste", ikona: Scissors },
+  { href: "/trebovanje", naziv: "Trebovanje", ikona: PackageCheck },
   { href: "/magacin", naziv: "Magacin", ikona: Warehouse },
   { href: "/racuni", naziv: "Računi", ikona: Receipt },
 ];

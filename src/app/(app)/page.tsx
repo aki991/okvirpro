@@ -113,11 +113,11 @@ export default async function Pregled() {
                 <tbody>
                   {sve.slice(0, 6).map((p) => (
                     <tr key={p.id} className="border-b border-line/60 last:border-0">
-                      <td className="py-2"><Link href={`/ponude/${p.id}`} className="font-mono font-semibold text-brand hover:underline">{p.broj}</Link></td>
-                      <td className="py-2">{p.klijent.naziv}</td>
+                      <td className="py-2 text-left"><Link href={`/ponude/${p.id}`} className="font-mono font-semibold text-brand hover:underline">{p.broj}</Link></td>
+                      <td className="py-2 text-left">{p.klijent.naziv}</td>
                       <td className="py-2 text-muted">{datum(p.createdAt)}</td>
                       <td className="py-2"><StatusBadge status={p.status} /></td>
-                      <td className="py-2 text-right font-semibold">{eur(p.ukupnoZaNaplatu)}</td>
+                      <td className="py-2 font-semibold tabular-nums">{eur(p.ukupnoZaNaplatu)}</td>
                     </tr>
                   ))}
                 </tbody>

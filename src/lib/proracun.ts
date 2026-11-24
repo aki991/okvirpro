@@ -198,6 +198,8 @@ const KRILO_DODATAK_ALU = 16;
 const STAKLO_ODBITAK = 8;
 const CELIK_ODBITAK = 120; // čelik rama
 const CELIK_KRILA_ODBITAK = 160; // čelik krila
+// Čelik prečke ide celom dužinom prečke (potvrđeno referentnim nalogom): T-spojnica na kraju prečke
+// se vijcima pričvršćuje u čelik, pa čelik mora da dođe do kraja.
 const STULP_ODBITAK = 70; // lažna prečka štulpa = visina krila − 70 (ako sistem nema svoju vrednost)
 
 const dodatakKrila = (c: Ctx) => (c.pvc ? KRILO_DODATAK_PVC : KRILO_DODATAK_ALU);
@@ -298,9 +300,12 @@ function izracunajOkov(k: Kontekst, krila: Ctx["krila"], stulpovi: number): Okov
   const dodajO = (kljuc: string, kol: number) => {
     const o = cena(kljuc);
     if (!o || kol <= 0) return;
-    const postoji = out.find((x) => x.naziv === o.naziv);
+    // štulp okov je drugi artikal od okova običnog krila (npr. „Donja šarka“ postoji u obe grupe) –
+    // zbraja se odvojeno da se u trebovanju ne pomeša
+    const naziv = o.grupa === "STULP" ? `${o.naziv} (štulp)` : o.naziv;
+    const postoji = out.find((x) => x.naziv === naziv);
     if (postoji) postoji.kolicina = r2(postoji.kolicina + kol);
-    else out.push({ naziv: o.naziv, kolicina: r2(kol), jedinica: o.poMetru ? "m" : "kom", cena: o.cena });
+    else out.push({ naziv, kolicina: r2(kol), jedinica: o.poMetru ? "m" : "kom", cena: o.cena });
   };
 
   for (const kr of krila) {
@@ -332,17 +337,23 @@ function izracunajOkov(k: Kontekst, krila: Ctx["krila"], stulpovi: number): Okov
       for (const kl of ["S_GORNJA_SARKA", "S_DONJA_SARKA", "RIGLA_GORE", "RIGLA_DOLE", "KLIN", "PRIHVATNICI_STULP", "NOSACI_SARKI_RAM", "PRIHVATNIK_KLINA", "PRIHVATNIK_RIGLE_GORE", "PRIHVATNIK_RIGLE_DOLE"]) dodajO(kl, 1);
       continue;
     }
-    // okretno-nagibno i kip
+    if (o === "KIP") {
+      // samo kip (nadsvetlo, ventus): ručica i kremona gore po širini, ugaoni prenosnici u oba gornja
+      // ugla, zatvarači gore i po jedan sa strane, dve bočne makaze i dve kip šarke dole
+      dodajO("GORNJI_UGAO", 2);
+      dodajO("BRAVA", sm);
+      dodajO("RUCICA", 1);
+      dodajO("PRIHVATNIK_ZATVARACA", Math.max(2, Math.ceil(sm / 0.6)) + 2);
+      dodajO("MAKAZA", 2);
+      dodajO("KIP_SARKA", 2);
+      continue;
+    }
+    // okretno-nagibno: kremona po visini (strana ručice)
     dodajO("GORNJI_UGAO", 1);
     dodajO("DONJI_UGAO", 1);
     dodajO("BRAVA", vm);
     dodajO("RUCICA", 1);
     dodajO("PRIHVATNIK_ZATVARACA", Math.max(2, Math.ceil(vm / 0.6)));
-    if (o === "KIP") {
-      dodajO("MAKAZA", 2);
-      dodajO("NOSAC_MAKAZE", sm);
-      continue;
-    }
     dodajO("NOSAC_MAKAZE", sm);
     dodajO("MAKAZA", 1);
     dodajO("LEDJNA_SINA", vm);

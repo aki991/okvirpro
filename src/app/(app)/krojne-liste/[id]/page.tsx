@@ -123,20 +123,20 @@ function Sipka({ s, rb }: { s: PlanProfila["sipke"][number]; rb: number }) {
       {/* tabela komada na šipki */}
       <table className="mt-1 w-full text-sm">
         <thead>
-          <tr className="text-left text-[11px] font-bold uppercase text-muted">
-            <th className="w-36 py-1 pr-3 font-bold">Dužina</th>
-            <th className="w-20 py-1 pr-3 font-bold">Ugao</th>
-            <th className="w-14 py-1 pr-3 text-right font-bold">Kom.</th>
-            <th className="py-1 pl-3 font-bold">Pozicije</th>
+          <tr className="text-[11px] font-bold uppercase text-muted">
+            <th className="w-36 px-2 py-1 font-bold">Dužina</th>
+            <th className="w-28 px-2 py-1 font-bold">Ugao</th>
+            <th className="w-20 px-2 py-1 font-bold">Kom.</th>
+            <th className="px-2 py-1 font-bold">Pozicije</th>
           </tr>
         </thead>
         <tbody>
           {tabela.map((g, i) => (
             <tr key={i} className="border-t border-line">
-              <td className="py-1 pr-3 tabular-nums font-bold">{g.mera.toLocaleString("sr-RS")} mm</td>
-              <td className="py-1 pr-3 font-bold" style={{ color: g.ugao === "45" ? PLAVA : ZELENA }}>{g.ugao === "45" ? "45° kosi" : "90° ravno"}</td>
-              <td className="py-1 pr-3 text-right tabular-nums font-bold">{g.kom}</td>
-              <td className="py-1 pl-3 text-brand">{g.poz.join(", ")}</td>
+              <td className="px-2 py-1 tabular-nums font-bold">{g.mera.toLocaleString("sr-RS")} mm</td>
+              <td className="px-2 py-1 font-bold" style={{ color: g.ugao === "45" ? PLAVA : ZELENA }}>{g.ugao === "45" ? "45° kosi" : "90° ravno"}</td>
+              <td className="px-2 py-1 tabular-nums font-bold">{g.kom}</td>
+              <td className="px-2 py-1 text-brand">{g.poz.join(", ")}</td>
             </tr>
           ))}
         </tbody>
@@ -192,10 +192,13 @@ export default async function KrojnaLista({ params }: { params: Promise<{ id: st
               const ukupnaDuzina = pr.sipke.reduce((a, s) => a + s.duzina, 0);
               const iskorisceno = ukupnaDuzina ? (pr.sipke.reduce((a, s) => a + s.komadi.reduce((b, k) => b + k.mera, 0), 0) / ukupnaDuzina) * 100 : 0;
               return (
-                <section key={pr.profilStavkaId}>
+                <section key={`${pr.profilStavkaId}|${pr.bojaSifra ?? ""}`}>
                   <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1 rounded-lg bg-background px-4 py-3">
                     <div>
-                      <p className="text-lg font-extrabold">{pr.profil}</p>
+                      <p className="text-lg font-extrabold">
+                        {pr.profil}
+                        {pr.boja && <span className="ml-2 rounded bg-accent-soft px-2 py-0.5 align-middle text-xs font-bold uppercase text-accent">{pr.boja}</span>}
+                      </p>
                       <p className="text-xs text-muted">
                         {pr.sistem} · {komada} {komada === 1 ? "komad" : "komada"} · {pr.metara.toFixed(2).replace(".", ",")} m · šipka {pr.duzinaSipke} mm
                       </p>

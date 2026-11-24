@@ -109,13 +109,13 @@ export function ListaPonuda({ ponude }: { ponude: Red[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-            <th className="px-3 py-3 font-semibold sm:px-5">
+            <th className="px-3 py-3 text-left font-semibold sm:px-5">
               <button type="button" className="flex items-center gap-1" onClick={() => setRastuce((r) => !r)}>
                 Broj ponude <ArrowUpDown size={13} />
               </button>
             </th>
-            <th className="px-3 py-3 font-semibold">Kupac</th>
-            <th className="px-3 py-3 text-right font-semibold">Iznos (EUR)</th>
+            <th className="px-3 py-3 text-left font-semibold">Kupac</th>
+            <th className="px-3 py-3 font-semibold">Iznos (EUR)</th>
             <th className="hidden px-3 py-3 font-semibold sm:table-cell">Status</th>
             <th className="hidden px-3 py-3 font-semibold md:table-cell">Kreirano</th>
             <th className="w-12" />
@@ -124,7 +124,7 @@ export function ListaPonuda({ ponude }: { ponude: Red[] }) {
         <tbody>
           {vidljive.map((p) => (
             <tr key={p.id} className="relative border-b border-line/60 last:border-0 hover:bg-background/60">
-              <td className="px-5 py-3">
+              <td className="px-5 py-3 text-left">
                 <Link href={`/ponude/${p.id}`} className="font-mono font-semibold text-brand hover:underline">{p.broj}</Link>
                 {p.izvor === "SAJT" && (
                   <span
@@ -136,8 +136,8 @@ export function ListaPonuda({ ponude }: { ponude: Red[] }) {
                   </span>
                 )}
               </td>
-              <td className="px-3 py-3">{p.kupac}</td>
-              <td className="px-3 py-3 text-right font-semibold">{eur(p.ukupnoZaNaplatu)}</td>
+              <td className="px-3 py-3 text-left">{p.kupac}</td>
+              <td className="px-3 py-3 font-semibold tabular-nums">{eur(p.ukupnoZaNaplatu)}</td>
               <td className="hidden px-3 py-3 sm:table-cell"><StatusBadge status={p.status} /></td>
               <td className="hidden px-3 py-3 text-muted md:table-cell">{datum(p.createdAt)}</td>
               <td className="relative px-3 py-3">

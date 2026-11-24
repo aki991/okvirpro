@@ -49,6 +49,7 @@ const OKOV: [string, string, string, boolean][] = [
   ["PROZOR", "NOSAC_DONJE_SARKE", "Nosač donje šarke", false],
   ["PROZOR", "KIP_PRIHVATNIK", "Kip prihvatnik", false],
   ["PROZOR", "PRIHVATNIK_ZATVARACA", "Prihvatnik zatvarača", false],
+  ["KIP", "KIP_SARKA", "Kip šarka (donja, sa ležištem na ramu)", false],
   ["STULP", "S_GORNJA_SARKA", "Gornja šarka", false],
   ["STULP", "S_DONJA_SARKA", "Donja šarka", false],
   ["STULP", "RIGLA_GORE", "Rigla gore", false],

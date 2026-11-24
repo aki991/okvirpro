@@ -104,13 +104,18 @@ export default async function Porudzbenica({ params }: { params: Promise<{ vrsta
       const plan = ponuda.utrosakProknjizen && ponuda.krojnaLista ? JSON.parse(ponuda.krojnaLista) : await napraviPlan(p);
       const stanja = await db.profilStavka.findMany({ where: { id: { in: plan.map((x: { profilStavkaId: number }) => x.profilStavkaId) } } });
       for (const pr of plan as Awaited<ReturnType<typeof napraviPlan>>) {
-        const naStanju = stanja.find((x) => x.id === pr.profilStavkaId)?.puneSipke ?? 0;
-        const poruciti = ponuda.utrosakProknjizen ? Math.max(0, -naStanju) : Math.max(0, pr.punihSipki - naStanju);
-        redovi.push([pr.sistem, pr.profil, pr.duzinaSipke, f2(pr.metara), pr.iskoriscenihOstataka, pr.punihSipki, naStanju, poruciti]);
+        // magacin vodi bele profile; profil u boji se uvek poručuje ceo
+        const naStanju = pr.bojaSifra ? 0 : stanja.find((x) => x.id === pr.profilStavkaId)?.puneSipke ?? 0;
+        const poruciti = pr.bojaSifra ? pr.punihSipki : ponuda.utrosakProknjizen ? Math.max(0, -naStanju) : Math.max(0, pr.punihSipki - naStanju);
+        redovi.push([pr.sistem, pr.boja ? `${pr.profil} – ${pr.boja}` : pr.profil, pr.duzinaSipke, f2(pr.metara), pr.iskoriscenihOstataka, pr.punihSipki, naStanju, poruciti]);
       }
       break;
     }
   }
+
+  // kolone sa tekstom (naziv, materijal, opis) su levo, a kolone sa brojevima centrirane
+  const brojcana = (j: number) => redovi.every((r) => r[j] === "" || typeof r[j] === "number" || /^[\d.,\s+×x-]+$/.test(String(r[j])));
+  const levo = (j: number) => redovi.length > 0 && !brojcana(j) && !/^(Poz|Pozicije|Jedinica|Napomena)/.test(kolone[j]);
 
   return (
     <>
@@ -149,9 +154,9 @@ export default async function Porudzbenica({ params }: { params: Promise<{ vrsta
           ) : (
             <table className="mt-8 w-full text-sm">
               <thead>
-                <tr className="border-y border-line bg-background text-left text-xs uppercase tracking-wide text-muted">
-                  {kolone.map((k) => (
-                    <th key={k} className="px-2 py-2 font-semibold">{k}</th>
+                <tr className="border-y border-line bg-background text-xs uppercase tracking-wide text-muted">
+                  {kolone.map((k, j) => (
+                    <th key={k} className={`px-2 py-2 font-semibold ${levo(j) ? "text-left" : ""}`}>{k}</th>
                   ))}
                 </tr>
               </thead>
@@ -159,14 +164,14 @@ export default async function Porudzbenica({ params }: { params: Promise<{ vrsta
                 {redovi.map((r, i) => (
                   <tr key={i} className="border-b border-line/60">
                     {r.map((c, j) => (
-                      <td key={j} className={`px-2 py-2 ${typeof c === "number" ? "font-mono font-semibold" : ""}`}>{c}</td>
+                      <td key={j} className={`px-2 py-2 ${levo(j) ? "text-left" : "tabular-nums"} ${typeof c === "number" ? "font-semibold" : ""}`}>{c}</td>
                     ))}
                   </tr>
                 ))}
                 {zbir && (
                   <tr className="font-bold">
                     {zbir.map((c, j) => (
-                      <td key={j} className="px-2 py-2">{c}</td>
+                      <td key={j} className={`px-2 py-2 ${levo(j) ? "text-left" : "tabular-nums"}`}>{c}</td>
                     ))}
                   </tr>
                 )}
