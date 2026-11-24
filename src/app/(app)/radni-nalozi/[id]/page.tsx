@@ -178,6 +178,7 @@ export default async function RadniNalog({ params }: { params: Promise<{ id: str
                     kolone={["Naziv", "Kol."]}
                     redovi={[
                       ...r.okov.map((o) => [o.naziv, `${o.kolicina} ${o.jedinica}`]),
+                      ...(r.pribor ?? []).map((o) => [o.naziv, `${o.kolicina} ${o.jedinica}`]),
                       ...r.komadi.map((x) => [x.naziv, `${x.kom} kom`]),
                       ...(s.rukohvat ? [[`Rukohvat ${s.rukohvat}`, "1 kom"]] : []),
                       ...(s.elektroPrihvatnik ? [["Elektro prihvatnik", "1 kom"]] : []),

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { napraviPlan, ucitajProizvodnju } from "@/lib/proizvodnja";
 import { profilnaVrsta } from "@/lib/stavka";
+import { nazivPoIzvoru } from "@/lib/trebovanje";
 import { visinaRoletne } from "@/lib/proracun";
 import { datum } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
@@ -88,8 +89,11 @@ export default async function Porudzbenica({ params }: { params: Promise<{ vrsta
         x.poz.add(poz);
         mapa.set(naziv, x);
       };
+      const nazivOkova = nazivPoIzvoru(pozicije.flatMap((x) => x.r.okov));
+      const nazivPribora = nazivPoIzvoru(pozicije.flatMap((x) => x.r.pribor ?? []));
       for (const { s, poz, r } of pozicije) {
-        for (const o of r.okov) dodaj(o.naziv, o.kolicina * s.kolicina, o.jedinica, poz);
+        for (const o of r.okov) dodaj(nazivOkova(o), o.kolicina * s.kolicina, o.jedinica, poz);
+        for (const o of r.pribor ?? []) dodaj(nazivPribora(o), o.kolicina * s.kolicina, o.jedinica, poz);
         for (const k of r.komadi) dodaj(k.naziv, k.kom * s.kolicina, "kom", poz);
         if (s.rukohvat) dodaj(`Rukohvat ${s.rukohvat}`, s.kolicina, "kom", poz);
         if (s.elektroPrihvatnik) dodaj("Elektro prihvatnik", s.kolicina, "kom", poz);

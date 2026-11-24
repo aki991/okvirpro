@@ -6,10 +6,13 @@ import { NoviSistem } from "./NoviSistem";
 export const dynamic = "force-dynamic";
 
 export default async function Profili() {
-  const sistemi = await db.profilSistem.findMany({
-    orderBy: [{ redosled: "asc" }, { id: "asc" }],
-    include: { stavke: { orderBy: { redosled: "asc" } } },
-  });
+  const [sistemi, okovSistemi] = await Promise.all([
+    db.profilSistem.findMany({
+      orderBy: [{ redosled: "asc" }, { id: "asc" }],
+      include: { stavke: { orderBy: { redosled: "asc" } }, pribor: { orderBy: [{ redosled: "asc" }, { id: "asc" }] } },
+    }),
+    db.okovSistem.findMany({ orderBy: [{ redosled: "asc" }, { id: "asc" }], select: { id: true, naziv: true } }),
+  ]);
 
   const grupe = [
     { tip: "PVC" as const, naslov: "PVC profili", opis: "Specifikacije i nabavne cene PVC sistema." },
@@ -34,7 +37,7 @@ export default async function Profili() {
               <div className="space-y-3">
                 {lista.length === 0 && <p className="text-sm text-muted">Nema unetih sistema.</p>}
                 {lista.map((s, i) => (
-                  <SistemKartica key={s.id} sistem={s} prvi={i === 0} poslednji={i === lista.length - 1} />
+                  <SistemKartica key={s.id} sistem={s} okovSistemi={okovSistemi} prvi={i === 0} poslednji={i === lista.length - 1} />
                 ))}
               </div>
             </section>
@@ -48,6 +51,11 @@ export default async function Profili() {
             <li><b>Unutrašnja visina</b>: koliko profil „jede“ od otvora (npr. ram 45 mm). Od nje zavise mere lajsni, krila i stakla.</li>
             <li><b>Širina/odbitak</b>: širina prečke ili lažne prečke, oduzima se pri podeli polja.</li>
             <li><b>Cena</b>: nabavna cena po metru, a za spojnice i poklopce po komadu.</li>
+            <li><b>Okovni sistem</b>: koji komplet okova ide uz profil (cene i nazivi se uređuju na stranici Okov).</li>
+            <li>
+              <b>Pribor</b>: materijal koji prati profil, a nije profil ni okov. Količina = faktor × osnova. Primeri: dihtung krila = 1 × obim krila (m),
+              dihtung stakla = 2 × obim stakla (m), ALU ugaonik = 1 × po uglu, kapica odvodnje = 2 × po krilu. Pribor ulazi u cenu i u trebovanje.
+            </li>
           </ul>
         </div>
       </div>

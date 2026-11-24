@@ -51,8 +51,25 @@ model ProfilSistem {
   naziv     String
   tip       String         // PVC | ALU
   redosled  Int            @default(0)
+  // okovni sistem koji se koristi uz ovaj profil (null = prvi okovni sistem)
+  okovSistemId Int?
+  okovSistem   OkovSistem?   @relation(fields: [okovSistemId], references: [id], onDelete: SetNull)
   stavke    ProfilStavka[]
+  pribor    PriborStavka[]
   ponudaStavke PonudaStavka[]
+}
+
+// ───────────── Pribor po profilnom sistemu (dihtunzi, ugaonici, kapice…) ─────────────
+// Količina = faktor × osnova (npr. obim krila u m, broj uglova, broj krila…).
+model PriborStavka {
+  id       Int          @id @default(autoincrement())
+  sistemId Int
+  sistem   ProfilSistem @relation(fields: [sistemId], references: [id], onDelete: Cascade)
+  naziv    String
+  osnova   String       // ELEMENT | KRILO | STAKLO | PRECKA | UGAO | OBIM_RAMA | OBIM_KRILA | OBIM_STAKLA | M2
+  faktor   Float        @default(1)
+  cena     Float        @default(0) // € po jedinici osnove (kom, m ili m²)
+  redosled Int          @default(0)
 }
 
 model ProfilStavka {
@@ -92,14 +109,30 @@ model BojaProfila {
 }
 
 // ───────────── Okov ─────────────
+// Okovni sistem = komplet okova jednog proizvođača/varijante (npr. „Maco PVC osa 13“, „Alumil ALU“).
+// Više profilnih sistema može deliti isti okovni sistem.
+model OkovSistem {
+  id            Int            @id @default(autoincrement())
+  naziv         String
+  metoda        String         @default("DETALJNO") // DETALJNO | PAUSALNO
+  poM2          Float          @default(0)          // € po m² krila (paušalno)
+  redosled      Int            @default(0)
+  stavke        OkovStavka[]
+  profilSistemi ProfilSistem[]
+}
+
 model OkovStavka {
-  id       Int     @id @default(autoincrement())
-  grupa    String  // PSK | PROZOR | KIP | STULP | VRATA
-  kljuc    String  @unique
-  naziv    String
-  cena     Float   @default(0)
-  poMetru  Boolean @default(false)
-  redosled Int     @default(0)
+  id           Int        @id @default(autoincrement())
+  okovSistemId Int
+  okovSistem   OkovSistem @relation(fields: [okovSistemId], references: [id], onDelete: Cascade)
+  grupa        String     // PSK | PROZOR | KIP | STULP | VRATA
+  kljuc        String
+  naziv        String
+  cena         Float      @default(0)
+  poMetru      Boolean    @default(false)
+  redosled     Int        @default(0)
+
+  @@unique([okovSistemId, kljuc])
 }
 
 // ───────────── Modeli (katalog) ─────────────

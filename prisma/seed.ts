@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { MODELI } from "../src/lib/modeli-katalog";
+import { OKOV_KATALOG } from "../src/lib/okov-katalog";
 
 const db = new PrismaClient();
 
@@ -33,39 +34,6 @@ const ALU_STAVKE: typeof PVC_STAVKE = [
   ["PODSTOK", "Podštok", 6000, 30, null, 6],
   ["SPOJNICA_PRECKE", "Spojnica prečke", null, null, null, 0, true],
   ["POKLOPAC_STULPA", "Poklopac štulpa", null, null, null, 0, true],
-];
-
-const OKOV: [string, string, string, boolean][] = [
-  ["PSK", "PSK_KRILO", "Cena po kliznom krilu", false],
-  ["PROZOR", "GORNJI_UGAO", "Gornji ugao", false],
-  ["PROZOR", "DONJI_UGAO", "Donji ugao", false],
-  ["PROZOR", "BRAVA", "Brava (zatvarač)", true],
-  ["PROZOR", "NOSAC_MAKAZE", "Nosač makaze", true],
-  ["PROZOR", "MAKAZA", "Makaza", false],
-  ["PROZOR", "LEDJNA_SINA", "Leđna šina", true],
-  ["PROZOR", "DONJA_SARKA", "Donja šarka", false],
-  ["PROZOR", "RUCICA", "Ručica na krilu", false],
-  ["PROZOR", "NOSAC_GORNJE_SARKE", "Nosač gornje šarke", false],
-  ["PROZOR", "NOSAC_DONJE_SARKE", "Nosač donje šarke", false],
-  ["PROZOR", "KIP_PRIHVATNIK", "Kip prihvatnik", false],
-  ["PROZOR", "PRIHVATNIK_ZATVARACA", "Prihvatnik zatvarača", false],
-  ["KIP", "KIP_SARKA", "Kip šarka (donja, sa ležištem na ramu)", false],
-  ["STULP", "S_GORNJA_SARKA", "Gornja šarka", false],
-  ["STULP", "S_DONJA_SARKA", "Donja šarka", false],
-  ["STULP", "RIGLA_GORE", "Rigla gore", false],
-  ["STULP", "RIGLA_DOLE", "Rigla dole", false],
-  ["STULP", "KLIN", "Klin (zatezač)", false],
-  ["STULP", "PRIHVATNICI_STULP", "Prihvatnici na štulpu", false],
-  ["STULP", "NOSACI_SARKI_RAM", "Nosači šarki na ramu", false],
-  ["STULP", "PRIHVATNIK_KLINA", "Prihvatnik klina", false],
-  ["STULP", "PRIHVATNIK_RIGLE_GORE", "Prihvatnik rigle gore", false],
-  ["STULP", "PRIHVATNIK_RIGLE_DOLE", "Prihvatnik rigle dole", false],
-  ["VRATA", "VRATNA_BRAVA", "Vratna brava", false],
-  ["VRATA", "CILINDAR", "Cilindar", false],
-  ["VRATA", "KVAKE", "Kvake / ručke set", false],
-  ["VRATA", "SARKA_VRATA", "Šarka (po komadu)", false],
-  ["VRATA", "PRIHVATNICI_BRAVE", "Prihvatnici brave", false],
-  ["VRATA", "PRIHVATNA_PLOCA", "Prihvatna ploča", false],
 ];
 
 const CENOVNIK: [string, string, number][] = [
@@ -154,8 +122,24 @@ async function main() {
     }
   }
 
-  for (const [j, [grupa, kljuc, naziv, poMetru]] of OKOV.entries()) {
-    await db.okovStavka.upsert({ where: { kljuc }, update: {}, create: { grupa, kljuc, naziv, poMetru, redosled: j } });
+  // okovni sistemi: podrazumevano PVC i ALU okov; profilni sistemi dobijaju okov svog tipa
+  if ((await db.okovSistem.count()) === 0) {
+    for (const [i, naziv] of ["PVC okov", "ALU okov"].entries()) {
+      const os = await db.okovSistem.create({ data: { naziv, redosled: i } });
+      await db.profilSistem.updateMany({ where: { tip: naziv.slice(0, 3), okovSistemId: null }, data: { okovSistemId: os.id } });
+    }
+  }
+  // svaki okovni sistem mora imati sve stavke koje proračun koristi
+  for (const os of await db.okovSistem.findMany()) {
+    // okvirne cene: ALU okov je ~40% skuplji od PVC okova
+    const alu = /alu/i.test(os.naziv);
+    for (const [j, [grupa, kljuc, naziv, poMetru, cena]] of OKOV_KATALOG.entries()) {
+      await db.okovStavka.upsert({
+        where: { okovSistemId_kljuc: { okovSistemId: os.id, kljuc } },
+        update: {},
+        create: { okovSistemId: os.id, grupa, kljuc, naziv, poMetru, cena: alu ? Math.round(cena * 14) / 10 : cena, redosled: j },
+      });
+    }
   }
 
   if ((await db.cenovnikStavka.count()) === 0) {

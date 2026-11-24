@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, Trash2 } from "lucide-react";
-import type { ProfilSistem, ProfilStavka } from "@prisma/client";
+import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2, X } from "lucide-react";
+import type { PriborStavka, ProfilSistem, ProfilStavka } from "@prisma/client";
 import { SaveButton, sacuvaj, type SaveState } from "@/components/SaveBar";
 import { obrisiSistem, pomeriSistem, sacuvajSistem } from "@/app/actions/sifarnici";
 import { broj } from "@/lib/format";
+import { PRIBOR_OSNOVE, jedinicaPribora } from "@/lib/proracun";
+
+type PriborRed = { kljuc: number; naziv: string; osnova: string; faktor: string; cena: string };
+let sledeciKljuc = 1;
 
 type Polja = "duzinaSipke" | "unutrasnjaVisina" | "sirinaOdbitak" | "cena";
 // Koje kolone ima smisla popunjavati za koju stavku
@@ -30,15 +34,24 @@ const str = (n: number | null) => (n === null || n === undefined ? "" : String(n
 
 export function SistemKartica({
   sistem,
+  okovSistemi,
   prvi,
   poslednji,
 }: {
-  sistem: ProfilSistem & { stavke: ProfilStavka[] };
+  sistem: ProfilSistem & { stavke: ProfilStavka[]; pribor: PriborStavka[] };
+  okovSistemi: { id: number; naziv: string }[];
   prvi: boolean;
   poslednji: boolean;
 }) {
   const [otvoreno, setOtvoreno] = useState(false);
   const [naziv, setNaziv] = useState(sistem.naziv);
+  const [okovId, setOkovId] = useState<number | null>(sistem.okovSistemId ?? okovSistemi[0]?.id ?? null);
+  const [pribor, setPribor] = useState<PriborRed[]>(() =>
+    sistem.pribor.map((p) => ({ kljuc: sledeciKljuc++, naziv: p.naziv, osnova: p.osnova, faktor: String(p.faktor), cena: String(p.cena) })),
+  );
+  const izmeniPribor = (kljuc: number, polje: keyof Omit<PriborRed, "kljuc">, v: string) =>
+    setPribor((l) => l.map((p) => (p.kljuc === kljuc ? { ...p, [polje]: v } : p)));
+  const okovNaziv = okovSistemi.find((o) => o.id === (sistem.okovSistemId ?? okovSistemi[0]?.id))?.naziv;
   const [vrednosti, setVrednosti] = useState(() =>
     Object.fromEntries(
       sistem.stavke.map((s) => [
@@ -62,6 +75,8 @@ export function SistemKartica({
           sirinaOdbitak: broj(vrednosti[s.id].sirinaOdbitak),
           cena: broj(vrednosti[s.id].cena) ?? 0,
         })),
+        okovId,
+        pribor.map((p) => ({ naziv: p.naziv, osnova: p.osnova, faktor: broj(p.faktor) ?? 1, cena: broj(p.cena) ?? 0 })),
       ),
     );
 
@@ -83,6 +98,7 @@ export function SistemKartica({
           <ChevronDown size={17} className={`transition ${otvoreno ? "rotate-180" : ""}`} />
           {sistem.naziv}
           <span className="rounded bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold text-brand">{sistem.tip}</span>
+          {okovNaziv && <span className="text-xs font-normal text-muted">· okov: {okovNaziv}{sistem.pribor.length ? ` · pribor: ${sistem.pribor.length}` : ""}</span>}
         </button>
         <button type="button" disabled={prvi || radi} onClick={() => start(() => pomeriSistem(sistem.id, -1))} className="rounded p-1.5 text-muted hover:bg-white disabled:opacity-30" aria-label="Pomeri gore">
           <ArrowUp size={15} />
@@ -98,6 +114,16 @@ export function SistemKartica({
             <div className="w-full sm:w-72">
               <label className="label">Naziv sistema</label>
               <input className="input" value={naziv} onChange={(e) => setNaziv(e.target.value)} />
+            </div>
+            <div className="w-full sm:w-64">
+              <label className="label">Okovni sistem</label>
+              <select className="input" value={okovId ?? ""} onChange={(e) => setOkovId(e.target.value ? Number(e.target.value) : null)}>
+                {okovSistemi.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.naziv}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex-1" />
             <button type="button" onClick={obrisi} className="btn-secondary text-danger" disabled={radi}>
@@ -150,6 +176,69 @@ export function SistemKartica({
               </tbody>
             </table>
           </div>
+
+          <div className="mt-6 flex items-end justify-between gap-3">
+            <div>
+              <h3 className="font-bold">Pribor uz profil</h3>
+              <p className="text-xs text-muted">Dihtunzi, ugaonici, kapice odvodnje… Količina = faktor × osnova, cena je po jedinici (kom, m ili m²).</p>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setPribor((l) => [...l, { kljuc: sledeciKljuc++, naziv: "", osnova: "OBIM_KRILA", faktor: "1", cena: "0" }])}
+            >
+              <Plus size={15} /> Dodaj pribor
+            </button>
+          </div>
+          {pribor.length === 0 ? (
+            <p className="mt-3 rounded-lg bg-background px-4 py-3 text-sm text-muted">Nema unetog pribora za ovaj sistem.</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="border-b border-line text-xs uppercase tracking-wide text-muted">
+                    <th className="py-2 pr-3 text-left font-semibold">Naziv</th>
+                    <th className="px-2 py-2 font-semibold">Osnova obračuna</th>
+                    <th className="w-24 px-2 py-2 font-semibold">Faktor</th>
+                    <th className="w-36 px-2 py-2 font-semibold">Cena (€)</th>
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {pribor.map((p) => (
+                    <tr key={p.kljuc} className="border-b border-line/60 last:border-0">
+                      <td className="py-1.5 pr-3">
+                        <input className="input !py-1.5" placeholder="npr. Dihtung krila" value={p.naziv} onChange={(e) => izmeniPribor(p.kljuc, "naziv", e.target.value)} />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <select className="input !py-1.5" value={p.osnova} onChange={(e) => izmeniPribor(p.kljuc, "osnova", e.target.value)}>
+                          {PRIBOR_OSNOVE.map((o) => (
+                            <option key={o.k} value={o.k}>
+                              {o.naziv} ({o.opis})
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <input className="input !py-1.5 text-center" inputMode="decimal" value={p.faktor} onChange={(e) => izmeniPribor(p.kljuc, "faktor", e.target.value)} />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <input className="input !py-1.5 text-center font-semibold" inputMode="decimal" value={p.cena} onChange={(e) => izmeniPribor(p.kljuc, "cena", e.target.value)} />
+                          <span className="whitespace-nowrap text-xs text-muted">€/{jedinicaPribora(p.osnova)}</span>
+                        </div>
+                      </td>
+                      <td className="py-1.5 pl-1">
+                        <button type="button" onClick={() => setPribor((l) => l.filter((x) => x.kljuc !== p.kljuc))} className="rounded p-1.5 text-muted hover:bg-background hover:text-danger" aria-label="Ukloni pribor">
+                          <X size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

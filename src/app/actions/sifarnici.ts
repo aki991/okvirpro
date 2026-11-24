@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import type { Cvor } from "@/lib/modeli-katalog";
+import { OKOV_KATALOG } from "@/lib/okov-katalog";
+import { PRIBOR_OSNOVE } from "@/lib/proracun";
 
 // ───────────── Podešavanja ─────────────
 export type FirmaUnos = {
@@ -39,17 +41,29 @@ export type ProfilStavkaUnos = {
   id: number; duzinaSipke: number | null; unutrasnjaVisina: number | null; sirinaOdbitak: number | null; cena: number;
 };
 
-export async function sacuvajSistem(id: number, naziv: string, stavke: ProfilStavkaUnos[]) {
+export type PriborUnos = { naziv: string; osnova: string; faktor: number; cena: number };
+
+export async function sacuvajSistem(id: number, naziv: string, stavke: ProfilStavkaUnos[], okovSistemId: number | null, pribor: PriborUnos[]) {
+  const osnove = new Set<string>(PRIBOR_OSNOVE.map((o) => o.k));
+  const priborOk = pribor.filter((p) => p.naziv.trim());
+  for (const p of priborOk) if (!osnove.has(p.osnova)) throw new Error(`Nepoznata osnova obračuna za „${p.naziv}“.`);
   await db.$transaction([
-    db.profilSistem.update({ where: { id }, data: { naziv: naziv.trim() } }),
+    db.profilSistem.update({ where: { id }, data: { naziv: naziv.trim(), okovSistemId } }),
     ...stavke.map((s) =>
       db.profilStavka.update({
         where: { id: s.id },
         data: { duzinaSipke: s.duzinaSipke, unutrasnjaVisina: s.unutrasnjaVisina, sirinaOdbitak: s.sirinaOdbitak, cena: s.cena },
       }),
     ),
+    db.priborStavka.deleteMany({ where: { sistemId: id } }),
+    db.priborStavka.createMany({
+      data: priborOk.map((p, i) => ({
+        sistemId: id, naziv: p.naziv.trim(), osnova: p.osnova, faktor: Math.max(0, p.faktor), cena: Math.max(0, p.cena), redosled: i,
+      })),
+    }),
   ]);
   revalidatePath("/profili");
+  revalidatePath("/okov");
 }
 
 const STAVKE_SISTEMA: Record<string, [string, string, boolean?][]> = {
@@ -68,11 +82,15 @@ const STAVKE_SISTEMA: Record<string, [string, string, boolean?][]> = {
 
 export async function dodajSistem(tip: "PVC" | "ALU", naziv: string) {
   const max = await db.profilSistem.aggregate({ _max: { redosled: true } });
+  // okov: isti kao kod postojećeg sistema istog tipa, inače prvi okovni sistem
+  const slican = await db.profilSistem.findFirst({ where: { tip, okovSistemId: { not: null } }, orderBy: { redosled: "asc" } });
+  const prvi = await db.okovSistem.findFirst({ orderBy: [{ redosled: "asc" }, { id: "asc" }] });
   await db.profilSistem.create({
     data: {
       naziv: naziv.trim() || `Novi ${tip} sistem`,
       tip,
       redosled: (max._max.redosled ?? 0) + 1,
+      okovSistemId: slican?.okovSistemId ?? prvi?.id ?? null,
       stavke: {
         create: STAVKE_SISTEMA[tip].map(([kljuc, n, poKomadu], i) => ({
           kljuc, naziv: n, poKomadu: !!poKomadu, redosled: i,
@@ -102,13 +120,52 @@ export async function pomeriSistem(id: number, smer: -1 | 1) {
   revalidatePath("/profili");
 }
 
-// ───────────── Okov ─────────────
-export async function sacuvajOkov(metoda: string, okovPoM2: number, cene: { id: number; cena: number }[]) {
+// ───────────── Okovni sistemi ─────────────
+export type OkovSistemUnos = { naziv: string; metoda: string; poM2: number };
+
+export async function sacuvajOkovSistem(id: number, os: OkovSistemUnos, stavke: { id: number; naziv: string; cena: number }[]) {
+  if (!os.naziv.trim()) throw new Error("Okovni sistem mora imati naziv.");
   await db.$transaction([
-    db.firma.update({ where: { id: 1 }, data: { okovMetoda: metoda, okovPoM2 } }),
-    ...cene.map((c) => db.okovStavka.update({ where: { id: c.id }, data: { cena: c.cena } })),
+    db.okovSistem.update({
+      where: { id },
+      data: { naziv: os.naziv.trim(), metoda: os.metoda === "PAUSALNO" ? "PAUSALNO" : "DETALJNO", poM2: Math.max(0, os.poM2) },
+    }),
+    ...stavke.map((s) =>
+      db.okovStavka.update({ where: { id: s.id, okovSistemId: id }, data: { cena: Math.max(0, s.cena), ...(s.naziv.trim() ? { naziv: s.naziv.trim() } : {}) } }),
+    ),
   ]);
   revalidatePath("/okov");
+  revalidatePath("/profili");
+}
+
+/** Novi okovni sistem – kopija postojećeg (nazivi i cene), ili prazan iz kataloga. */
+export async function dodajOkovSistem(naziv: string, izvorId: number | null): Promise<number> {
+  const max = await db.okovSistem.aggregate({ _max: { redosled: true } });
+  const izvor = izvorId ? await db.okovStavka.findMany({ where: { okovSistemId: izvorId } }) : [];
+  const os = await db.okovSistem.create({
+    data: {
+      naziv: naziv.trim() || "Novi okovni sistem",
+      redosled: (max._max.redosled ?? 0) + 1,
+      ...(izvorId ? await db.okovSistem.findUnique({ where: { id: izvorId }, select: { metoda: true, poM2: true } }) : {}),
+      stavke: {
+        create: OKOV_KATALOG.map(([grupa, kljuc, n, poMetru, okvirno], j) => {
+          const x = izvor.find((i) => i.kljuc === kljuc);
+          return { grupa, kljuc, naziv: x?.naziv ?? n, cena: x?.cena ?? okvirno, poMetru, redosled: j };
+        }),
+      },
+    },
+  });
+  revalidatePath("/okov");
+  revalidatePath("/profili");
+  return os.id;
+}
+
+export async function obrisiOkovSistem(id: number) {
+  if ((await db.okovSistem.count()) <= 1) throw new Error("Mora postojati bar jedan okovni sistem.");
+  // profilni sistemi koji su ga koristili prelaze na prvi okovni sistem (relacija SetNull)
+  await db.okovSistem.delete({ where: { id } });
+  revalidatePath("/okov");
+  revalidatePath("/profili");
 }
 
 // ───────────── Modeli ─────────────

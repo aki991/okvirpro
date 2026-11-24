@@ -202,6 +202,15 @@ export default async function Trebovanje({ params }: { params: Promise<{ id: str
             />
 
             <Tabela
+              naslov="Pribor uz profile"
+              ikona={Package}
+              kolone={["Naziv", "Količina", "Jed.", "Pozicije"]}
+              desno={[1]}
+              redovi={t.pribor.map((x) => [x.naziv, <b key="k">{br(x.kolicina)}</b>, x.jedinica, poz(x.pozicije)])}
+              napomena="Pribor se zadaje po profilnom sistemu (stranica Profili): dihtunzi po metru, ugaonici, kapice i sl."
+            />
+
+            <Tabela
               naslov="Roletne, komarnici, daske i okapnice"
               ikona={PackagePlus}
               kolone={["Vrsta", "Materijal", "Mera (mm)", "Kom", "Količina", "Pozicije"]}

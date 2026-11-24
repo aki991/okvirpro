@@ -62,11 +62,24 @@ export type KontekstProfil = {
   cena: number;
   poKomadu: boolean;
 };
-export type KontekstSistem = { id: number; naziv: string; tip: string; stavke: KontekstProfil[] };
+export type KontekstPribor = { naziv: string; osnova: string; faktor: number; cena: number };
+export type KontekstSistem = {
+  id: number;
+  naziv: string;
+  tip: string;
+  stavke: KontekstProfil[];
+  /** okovni sistem uz ovaj profil; null/undefined = prvi okovni sistem */
+  okovSistemId?: number | null;
+  pribor?: KontekstPribor[];
+};
+export type KontekstOkov = { kljuc: string; grupa: string; naziv: string; cena: number; poMetru: boolean };
+export type KontekstOkovSistem = { id: number; naziv: string; metoda: string; poM2: number; stavke: KontekstOkov[] };
 export type Kontekst = {
   sistemi: KontekstSistem[];
   cenovnik: { kategorija: string; naziv: string; cena: number }[];
-  okov: { kljuc: string; grupa: string; naziv: string; cena: number; poMetru: boolean }[];
+  /** okovni sistemi; ako ih nema, koristi se `okov` / `okovMetoda` / `okovPoM2` */
+  okovSistemi?: KontekstOkovSistem[];
+  okov: KontekstOkov[];
   okovMetoda: string;
   okovPoM2: number;
   modeli: { sifra: string; naziv: string; kategorija: string; definicija: Cvor }[];
@@ -154,14 +167,30 @@ export function mereOpcija(s: Pick<StavkaUlaz, "podstok" | "prosirenjeL" | "pros
   };
 }
 export type StakloRez = { opis: string; sirina: number; visina: number; kom: number };
-export type OkovRez = { naziv: string; kolicina: number; jedinica: string; cena: number };
+/** `izvor` = naziv okovnog sistema (okov) ili profilnog sistema (pribor) – da se u trebovanju ne pomešaju isti nazivi. */
+export type OkovRez = { naziv: string; kolicina: number; jedinica: string; cena: number; izvor?: string };
 export type TrosakRed = { naziv: string; iznos: number };
+
+/** Osnove za obračun pribora: količina = faktor × osnova. */
+export const PRIBOR_OSNOVE = [
+  { k: "ELEMENT", naziv: "Po elementu", jedinica: "kom", opis: "1 po poziciji" },
+  { k: "KRILO", naziv: "Po krilu", jedinica: "kom", opis: "broj krila" },
+  { k: "STAKLO", naziv: "Po staklu", jedinica: "kom", opis: "broj stakala" },
+  { k: "PRECKA", naziv: "Po prečki", jedinica: "kom", opis: "broj prečki" },
+  { k: "UGAO", naziv: "Po uglu", jedinica: "kom", opis: "4 ugla rama + 4 po krilu" },
+  { k: "OBIM_RAMA", naziv: "Obim rama", jedinica: "m", opis: "metara po obimu rama" },
+  { k: "OBIM_KRILA", naziv: "Obim krila", jedinica: "m", opis: "zbir obima svih krila" },
+  { k: "OBIM_STAKLA", naziv: "Obim stakla", jedinica: "m", opis: "zbir obima svih stakala" },
+  { k: "M2", naziv: "Površina", jedinica: "m²", opis: "m² pozicije" },
+] as const;
+export const jedinicaPribora = (osnova: string) => PRIBOR_OSNOVE.find((o) => o.k === osnova)?.jedinica ?? "kom";
 
 export type Rezultat = {
   rezovi: Rez[];
   celik: Rez[];
   staklo: StakloRez[];
   okov: OkovRez[];
+  pribor: OkovRez[];
   komadi: { naziv: string; kom: number; cena: number }[];
   troskovi: TrosakRed[];
   trosakKom: number; // nabavna cena po komadu
@@ -294,8 +323,15 @@ function obidji(c: Ctx, cvor: Cvor, w: number, h: number) {
 }
 
 // ───────────── Okov ─────────────
-function izracunajOkov(k: Kontekst, krila: Ctx["krila"], stulpovi: number): OkovRez[] {
-  const cena = (kljuc: string) => k.okov.find((o) => o.kljuc === kljuc);
+/** Okovni sistem profilnog sistema (ili prvi; bez okovnih sistema – opšti okov iz konteksta). */
+export function okovSistemZa(k: Kontekst, sistem: KontekstSistem | undefined) {
+  const os = k.okovSistemi?.find((x) => x.id === sistem?.okovSistemId) ?? k.okovSistemi?.[0];
+  return os ?? { id: 0, naziv: "", metoda: k.okovMetoda, poM2: k.okovPoM2, stavke: k.okov };
+}
+
+function izracunajOkov(k: Kontekst, sistem: KontekstSistem, krila: Ctx["krila"], stulpovi: number): OkovRez[] {
+  const os = okovSistemZa(k, sistem);
+  const cena = (kljuc: string) => os.stavke.find((o) => o.kljuc === kljuc);
   const out: OkovRez[] = [];
   const dodajO = (kljuc: string, kol: number) => {
     const o = cena(kljuc);
@@ -325,11 +361,11 @@ function izracunajOkov(k: Kontekst, krila: Ctx["krila"], stulpovi: number): Okov
       dodajO("PRIHVATNA_PLOCA", 1);
       continue;
     }
-    if (k.okovMetoda === "PAUSALNO") {
+    if (os.metoda === "PAUSALNO") {
       const postoji = out.find((x) => x.naziv === "Okov paušalno");
       const m2 = r2(sm * vm);
       if (postoji) postoji.kolicina = r2(postoji.kolicina + m2);
-      else out.push({ naziv: "Okov paušalno", kolicina: m2, jedinica: "m²", cena: k.okovPoM2 });
+      else out.push({ naziv: "Okov paušalno", kolicina: m2, jedinica: "m²", cena: os.poM2 });
       continue;
     }
     if (o === "O_L" || o === "O_D") {
@@ -363,12 +399,32 @@ function izracunajOkov(k: Kontekst, krila: Ctx["krila"], stulpovi: number): Okov
     dodajO("KIP_PRIHVATNIK", 1);
   }
   void stulpovi;
+  if (os.naziv) for (const x of out) x.izvor = os.naziv;
+  return out;
+}
+
+// ───────────── Pribor (po profilnom sistemu) ─────────────
+type Osnove = Record<(typeof PRIBOR_OSNOVE)[number]["k"], number>;
+
+function izracunajPribor(sistem: KontekstSistem, o: Osnove): OkovRez[] {
+  const out: OkovRez[] = [];
+  for (const p of sistem.pribor ?? []) {
+    const osnova = o[p.osnova as keyof Osnove] ?? 0;
+    const jed = jedinicaPribora(p.osnova);
+    const sirovo = p.faktor * osnova;
+    // komadi se zaokružuju naviše, metri i m² na 2 decimale
+    const kolicina = jed === "kom" ? Math.ceil(sirovo - 1e-9) : r2(sirovo);
+    if (!p.naziv.trim() || kolicina <= 0) continue;
+    const postoji = out.find((x) => x.naziv === p.naziv && x.jedinica === jed);
+    if (postoji) postoji.kolicina = r2(postoji.kolicina + kolicina);
+    else out.push({ naziv: p.naziv, kolicina, jedinica: jed, cena: p.cena, izvor: sistem.naziv });
+  }
   return out;
 }
 
 // ───────────── Glavna funkcija ─────────────
 export function izracunaj(k: Kontekst, s: StavkaUlaz): Rezultat {
-  const prazno: Rezultat = { rezovi: [], celik: [], staklo: [], okov: [], komadi: [], troskovi: [], trosakKom: 0, cenaKom: 0, povrsina: 0 };
+  const prazno: Rezultat = { rezovi: [], celik: [], staklo: [], okov: [], pribor: [], komadi: [], troskovi: [], trosakKom: 0, cenaKom: 0, povrsina: 0 };
   const W = s.sirina || 0;
   const H = s.visina || 0;
   const pdv = 1 + k.pdvStopa / 100;
@@ -463,9 +519,24 @@ export function izracunaj(k: Kontekst, s: StavkaUlaz): Rezultat {
   const m2Stakla = c.staklo.filter((g) => !g.opis.endsWith("(panel)")).reduce((a, g) => a + (g.sirina * g.visina * g.kom) / 1e6, 0);
   if (staklo) troskovi.push({ naziv: `Staklo ${staklo.naziv} (${r2(m2Stakla)} m²)`, iznos: m2Stakla * staklo.cena });
 
-  const okov = izracunajOkov(k, c.krila, c.stulpovi);
+  const okov = izracunajOkov(k, sistem, c.krila, c.stulpovi);
   const okovUkupno = okov.reduce((a, o) => a + o.kolicina * o.cena, 0);
   if (okovUkupno) troskovi.push({ naziv: "Okov", iznos: okovUkupno });
+
+  const stakla = c.staklo.filter((g) => !g.opis.endsWith("(panel)"));
+  const pribor = izracunajPribor(sistem, {
+    ELEMENT: 1,
+    KRILO: c.krila.length,
+    STAKLO: stakla.reduce((a, g) => a + g.kom, 0),
+    PRECKA: c.precke,
+    UGAO: 4 + 4 * c.krila.length,
+    OBIM_RAMA: (2 * (Wn + v) + 2 * (Hn + v)) / 1000,
+    OBIM_KRILA: c.krila.reduce((a, kr) => a + 2 * (kr.sirina + kr.visina), 0) / 1000,
+    OBIM_STAKLA: stakla.reduce((a, g) => a + 2 * (g.sirina + g.visina) * g.kom, 0) / 1000,
+    M2: (W * H) / 1e6,
+  });
+  const priborUkupno = pribor.reduce((a, o) => a + o.kolicina * o.cena, 0);
+  if (priborUkupno) troskovi.push({ naziv: "Pribor (dihtunzi, ugaonici…)", iznos: priborUkupno });
 
   if (vrataVrsta) {
     const ruk = k.cenovnik.find((x) => x.kategorija === "RUKOHVAT" && x.naziv === s.rukohvat);
@@ -498,6 +569,7 @@ export function izracunaj(k: Kontekst, s: StavkaUlaz): Rezultat {
     celik: c.celik,
     staklo: c.staklo,
     okov,
+    pribor,
     komadi,
     troskovi: troskovi.map((t) => ({ ...t, iznos: r2(t.iznos) })).concat(panel ? [{ naziv: `Panel ${panel.naziv} (prodajna, neto)`, iznos: r2(panelNeto) }] : []),
     trosakKom: r2(trosakKom + panelNeto),

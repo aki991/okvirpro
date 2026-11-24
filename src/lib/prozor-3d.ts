@@ -6,6 +6,7 @@ import * as THREE from "three";
 import type { Cvor } from "./modeli-katalog";
 import { BE92_KRILO, BE92_LAJSNA, BE92_PRECKA, BE92_RAM, SKLOP_BE92 as S, zaobljeniUglovi, type Kontura, type Presek } from "./profili-3d";
 import { napraviRaspored, type Pravougaonik } from "./prozor-raspored";
+import { jeDekor } from "@/components/ProzorRealno";
 
 export type Prozor3DParametri = {
   definicija: Cvor;
@@ -47,6 +48,86 @@ function izvuci(spoljna: Kontura, rupe: Kontura[], L: number) {
   return new THREE.ExtrudeGeometry(s, { depth: L, bevelEnabled: false, curveSegments: 4 });
 }
 
+// ───────────── dekor (drvena folija) ─────────────
+// Tekstura pokriva DEKOR_U × DEKOR_V mm; godovi idu duž U ose (duž profila).
+const DEKOR_U = 700;
+const DEKOR_V = 175;
+
+/** UV koordinate u milimetrima duž zadate ose (godovi prate dužinu profila/kutije). */
+function uvDuz(g: THREE.BufferGeometry, osa: "x" | "y" | "z", pomak = new THREE.Vector3()) {
+  const p = g.getAttribute("position");
+  const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) + pomak.x;
+    const y = p.getY(i) + pomak.y;
+    const z = p.getZ(i) + pomak.z;
+    const duz = osa === "x" ? x : osa === "y" ? y : z;
+    const popr = osa === "x" ? y + z : osa === "y" ? x + z : x + y;
+    uv[2 * i] = duz / DEKOR_U;
+    uv[2 * i + 1] = popr / DEKOR_V;
+  }
+  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+}
+
+/** Pseudo-slučajni brojevi sa semenom (ista tekstura pri svakom crtanju). */
+function rng(seme: number) {
+  let s = seme >>> 0 || 1;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+}
+
+/** Tekstura drvenog dekora u boji profila: osnova, talasasti godovi i sitne pore – kao u 2D crtežu. */
+function teksturaDekora(hex: string) {
+  const c = document.createElement("canvas");
+  c.width = 1024;
+  c.height = 256;
+  const g = c.getContext("2d")!;
+  // osnova je malo tamnija jer filmsko tonsko mapiranje scene posvetljava boje
+  const osnova = new THREE.Color(hex).lerp(new THREE.Color("#000000"), 0.12);
+  const css = (k: THREE.Color) => `#${k.getHexString()}`;
+  g.fillStyle = css(osnova);
+  g.fillRect(0, 0, c.width, c.height);
+  const r = rng(parseInt(hex.slice(1), 16));
+  const tamna = osnova.clone().lerp(new THREE.Color("#1c0f06"), 0.45);
+  const svetla = osnova.clone().lerp(new THREE.Color("#fff3dc"), 0.22);
+  // široke trake (različita gustina drveta)
+  for (let i = 0; i < 14; i++) {
+    const y = r() * c.height;
+    const h = 6 + r() * 26;
+    g.globalAlpha = 0.08 + r() * 0.12;
+    g.fillStyle = css(r() < 0.5 ? tamna : svetla);
+    g.fillRect(0, y, c.width, h);
+  }
+  // godovi: talasaste linije duž cele dužine (bešavno po U jer je period ceo broj talasa)
+  for (let i = 0; i < 70; i++) {
+    const y0 = r() * c.height;
+    const amp = 1 + r() * 5;
+    const talasa = 1 + Math.floor(r() * 3);
+    const faza = r() * Math.PI * 2;
+    g.globalAlpha = 0.12 + r() * 0.35;
+    g.strokeStyle = css(r() < 0.75 ? tamna : svetla);
+    g.lineWidth = 0.6 + r() * 1.8;
+    g.beginPath();
+    for (let x = 0; x <= c.width; x += 8) {
+      const y = y0 + Math.sin((x / c.width) * Math.PI * 2 * talasa + faza) * amp;
+      if (x === 0) g.moveTo(x, y);
+      else g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+  // pore
+  g.fillStyle = css(tamna);
+  for (let i = 0; i < 900; i++) {
+    g.globalAlpha = 0.15 + r() * 0.3;
+    g.fillRect(r() * c.width, r() * c.height, 3 + r() * 9, 0.8);
+  }
+  g.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /** Kosi rez 45° na oba kraja: tačke na krajevima se pomeraju za svoju „visinu“ (y) ka unutra. */
 function seci45(g: THREE.BufferGeometry, L: number) {
   const pos = g.attributes.position as THREE.BufferAttribute;
@@ -76,6 +157,7 @@ function clan(grupa: THREE.Group, p: Presek, mat: Materijali, L: number, pocetak
   for (const z of p.zaptivke) delovi.push([izvuci(z.kontura, [], L), mat.epdm]);
   for (const [g, m] of delovi) {
     if (kosi) seci45(g, L);
+    uvDuz(g, "z"); // lokalno z = dužina profila → godovi dekora idu duž profila
     const mesh = new THREE.Mesh(postavi(g, pocetak, unutra, duz), m);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -99,7 +181,12 @@ function okvir(grupa: THREE.Group, p: Presek, mat: Materijali, r: Pravougaonik, 
 const prosiri = (r: Pravougaonik, d: number): Pravougaonik => ({ x: r.x - d, y: r.y - d, w: r.w + 2 * d, h: r.h + 2 * d });
 
 function kutija(grupa: THREE.Group, mat: THREE.Material, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, senka = true) {
-  const g = new THREE.BoxGeometry(Math.abs(x2 - x1), Math.abs(y2 - y1), Math.abs(z2 - z1));
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+  const dz = Math.abs(z2 - z1);
+  const g = new THREE.BoxGeometry(dx, dy, dz);
+  // dekor: godovi duž najduže strane, UV u koordinatama sveta da se šara nastavlja preko delova
+  if (mat.userData.dekor) uvDuz(g, dx >= dy && dx >= dz ? "x" : dy >= dz ? "y" : "z", new THREE.Vector3((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2));
   const m = new THREE.Mesh(g, mat);
   m.position.set((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
   m.castShadow = senka;
@@ -318,14 +405,25 @@ export function napraviProzor3D(par: Prozor3DParametri) {
   // bela ostaje kao do sada; tamnije boje (dekor/folija) su mat sa blagim sjajem
   const obojen = !!par.boja && par.boja.toLowerCase() !== "#f6f6f1";
   const boja = obojen ? par.boja! : par.alu ? "#a7adb1" : "#f6f6f1";
+  // drveni dekor (zlatni hrast, orah, mahagoni…) dobija teksturu godova, isto kao u 2D crtežu
+  const dekor = obojen && jeDekor(boja);
+  const tDekor = dekor ? teksturaDekora(boja) : null;
   const pvc = new THREE.MeshPhysicalMaterial({
-    color: boja,
-    roughness: obojen ? 0.5 : par.alu ? 0.45 : 0.32,
+    color: dekor ? "#ffffff" : boja,
+    map: tDekor,
+    roughness: dekor ? 0.62 : obojen ? 0.5 : par.alu ? 0.45 : 0.32,
     metalness: par.alu && !obojen ? 0.65 : par.alu ? 0.35 : 0,
-    clearcoat: par.alu ? 0 : obojen ? 0.2 : 0.35,
-    clearcoatRoughness: 0.3,
+    clearcoat: par.alu ? 0 : dekor ? 0.08 : obojen ? 0.2 : 0.35,
+    clearcoatRoughness: 0.4,
     side: THREE.DoubleSide,
   });
+  pvc.userData.dekor = dekor;
+  /** materijal dodatka (kutija, lamele…) u boji prozora – sa dekorom ako ga prozor ima */
+  const uBoji = (o: THREE.MeshStandardMaterialParameters) => {
+    const m = new THREE.MeshStandardMaterial(dekor ? { ...o, color: "#ffffff", map: tDekor, metalness: 0.05, roughness: 0.6 } : o);
+    m.userData.dekor = dekor;
+    return m;
+  };
   const epdm = new THREE.MeshStandardMaterial({ color: "#151617", roughness: 0.85, side: THREE.DoubleSide });
   const mStaklo = new THREE.MeshPhysicalMaterial({
     color: "#cfe7ec",
@@ -584,8 +682,8 @@ export function napraviProzor3D(par: Prozor3DParametri) {
   let roletna: { dMin: number; dMax: number; d: number; cilj: number; postavi: (d: number) => void } | null = null;
   if (par.dodaci.roletna) {
     const rh = par.dodaci.roletnaVisina ?? 180;
-    const mRol = obojen ? new THREE.MeshStandardMaterial({ color: boja, metalness: 0.3, roughness: 0.5 }) : mDodatak;
-    const mKapa = new THREE.MeshStandardMaterial({ color: obojen ? boja : "#cfd3d2", roughness: 0.55, metalness: 0.2 });
+    const mRol = obojen ? uBoji({ color: boja, metalness: 0.3, roughness: 0.5 }) : mDodatak;
+    const mKapa = uBoji({ color: obojen ? boja : "#cfd3d2", roughness: 0.55, metalness: 0.2 });
     // nadgradna kutija je dublja od štoka i viri ka sobi (revizioni poklopac je iznutra odozdo)
     const prepust = Math.max(0, par.dodaci.roletnaPrepust ?? PREPUST_KUTIJE);
     const zUn = S.dubinaRama + prepust;
@@ -604,16 +702,18 @@ export function napraviProzor3D(par: Prozor3DParametri) {
     const zLam = imaKomarnik ? -30 : -9; // unutrašnje lice lamele
 
     // lamele (instancirane) + završna lamela sa gumom
-    const mLam = new THREE.MeshStandardMaterial({ color: obojen ? boja : "#eef0ee", roughness: 0.5, metalness: obojen ? 0.15 : 0.05, side: THREE.DoubleSide });
+    const mLam = uBoji({ color: obojen ? boja : "#eef0ee", roughness: 0.5, metalness: obojen ? 0.15 : 0.05, side: THREE.DoubleSide });
     const sirL = W - 2 * 16;
     const n = Math.ceil((H - ps) / 37) + 2;
-    const lamele = new THREE.InstancedMesh(geometrijaLamele(sirL), mLam, n);
+    const gLam = geometrijaLamele(sirL);
+    if (dekor) uvDuz(gLam, "x"); // godovi duž lamele
+    const lamele = new THREE.InstancedMesh(gLam, mLam, n);
     lamele.castShadow = true;
     lamele.receiveShadow = true;
     lamele.frustumCulled = false;
     grupa.add(lamele);
     const zavrsna = new THREE.Group();
-    kutija(zavrsna, new THREE.MeshStandardMaterial({ color: obojen ? boja : "#d9dcdb", metalness: 0.45, roughness: 0.4 }), 16, 6, zLam - 11, W - 16, 44, zLam);
+    kutija(zavrsna, uBoji({ color: obojen ? boja : "#d9dcdb", metalness: 0.45, roughness: 0.4 }), 16, 6, zLam - 11, W - 16, 44, zLam);
     kutija(zavrsna, epdm, 18, 0, zLam - 9, W - 18, 6, zLam - 2);
     // zaustavljači na vrhu završne lamele (da ne uđe u kutiju)
     for (const xs of [W * 0.2, W * 0.8]) kutija(zavrsna, epdm, xs - 12, 44, zLam - 14, xs + 12, 58, zLam - 1);

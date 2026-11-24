@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import { DODACI, mereOpcija, visinaRoletne } from "./proracun";
+import { DODACI, mereOpcija, visinaRoletne, type OkovRez } from "./proracun";
 import type { PlanProfila } from "./krojenje";
 import { napraviPlan, type Proizvodnja } from "./proizvodnja";
 import { profilnaVrsta } from "./stavka";
@@ -32,6 +32,7 @@ export type Trebovanje = {
   staklo: RedStakla[];
   paneli: RedArtikla[];
   okov: RedArtikla[];
+  pribor: RedArtikla[];
   dodaci: RedDodatka[];
   potrosni: RedArtikla[];
   greske: string[];
@@ -91,8 +92,12 @@ export async function napraviTrebovanje(p: Proizvodnja): Promise<Trebovanje> {
   const staklo: RedStakla[] = [];
   const paneli: RedArtikla[] = [];
   const okov: RedArtikla[] = [];
+  const pribor: RedArtikla[] = [];
   const dodaci: RedDodatka[] = [];
   const potrosni: RedArtikla[] = [];
+  // ako nalog ima više okovnih/profilnih sistema, isti naziv artikla se razdvaja po sistemu
+  const nazivOkova = nazivPoIzvoru(pozicije.flatMap((x) => x.r.okov));
+  const nazivPribora = nazivPoIzvoru(pozicije.flatMap((x) => x.r.pribor ?? []));
 
   for (const { s, poz, r } of pozicije) {
     const n = s.kolicina;
@@ -134,7 +139,8 @@ export async function napraviTrebovanje(p: Proizvodnja): Promise<Trebovanje> {
     }
 
     // ── okov i sitni delovi ──
-    for (const o of r.okov) sabiraj(okov, o.naziv, o.kolicina * n, o.jedinica, poz);
+    for (const o of r.okov) sabiraj(okov, nazivOkova(o), o.kolicina * n, o.jedinica, poz);
+    for (const o of r.pribor ?? []) sabiraj(pribor, nazivPribora(o), o.kolicina * n, o.jedinica, poz);
     for (const x of r.komadi) sabiraj(okov, x.naziv, x.kom * n, "kom", poz);
     if (s.rukohvat) sabiraj(okov, `Rukohvat ${s.rukohvat}`, n, "kom", poz);
     if (s.elektroPrihvatnik) sabiraj(okov, "Elektro prihvatnik", n, "kom", poz);
@@ -181,5 +187,11 @@ export async function napraviTrebovanje(p: Proizvodnja): Promise<Trebovanje> {
   }
 
   staklo.sort((a, b) => a.vrsta.localeCompare(b.vrsta) || b.sirina * b.visina - a.sirina * a.visina);
-  return { profili, staklo, paneli, okov, dodaci, potrosni, greske, proknjizeno };
+  return { profili, staklo, paneli, okov, pribor, dodaci, potrosni, greske, proknjizeno };
+}
+
+/** Naziv artikla sa sistemom u zagradi – samo kad nalog ima artikle iz više sistema. */
+export function nazivPoIzvoru(svi: OkovRez[]) {
+  const vise = new Set(svi.map((o) => o.izvor ?? "")).size > 1;
+  return (o: OkovRez) => (vise && o.izvor ? `${o.naziv} – ${o.izvor}` : o.naziv);
 }
