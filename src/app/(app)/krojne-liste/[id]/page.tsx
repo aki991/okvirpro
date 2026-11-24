@@ -88,7 +88,7 @@ function Sipka({ s, rb }: { s: PlanProfila["sipke"][number]; rb: number }) {
                   boxShadow: "inset 0 0 0 1px rgba(255,255,255,.25)",
                 }}
               >
-                <span className="whitespace-nowrap font-mono text-sm font-extrabold text-white drop-shadow-sm">{k.mera}</span>
+                <span className="whitespace-nowrap tabular-nums text-sm font-extrabold text-white drop-shadow-sm">{k.mera}</span>
               </div>
             ))}
           </div>
@@ -101,8 +101,8 @@ function Sipka({ s, rb }: { s: PlanProfila["sipke"][number]; rb: number }) {
               const kraj = { color: k.ugao === "45" ? PLAVA : "#7b8a86" };
               return (
                 <span key={i}>
-                  <span className="absolute top-0" style={{ left: pct(levo), ...kraj }}>{ugao}</span>
-                  <span className="absolute top-0 -translate-x-full" style={{ left: pct(levo + k.mera), ...kraj }}>{ugao}</span>
+                  <span className="absolute top-0 pl-1" style={{ left: pct(levo), ...kraj }}>{ugao}</span>
+                  <span className="absolute top-0 -translate-x-full pr-1" style={{ left: pct(levo + k.mera), ...kraj }}>{ugao}</span>
                   <span className="absolute top-0 -translate-x-1/2 whitespace-nowrap" style={{ left: pct(levo + k.mera / 2), color: boja }} title={opisOznake(k.oznaka)}>
                     {k.oznaka}
                   </span>
@@ -114,7 +114,7 @@ function Sipka({ s, rb }: { s: PlanProfila["sipke"][number]; rb: number }) {
 
         <div className="pt-0.5 text-right">
           <p className="text-[11px] text-muted">{otpad ? "Otpad" : "Ostatak"}</p>
-          <p className={`font-mono text-sm font-extrabold ${otpad ? "text-danger" : "text-foreground"}`}>
+          <p className={`tabular-nums text-sm font-extrabold ${otpad ? "text-danger" : "text-foreground"}`}>
             {Math.round(s.ostatak).toLocaleString("sr-RS")} mm
           </p>
         </div>
@@ -133,9 +133,9 @@ function Sipka({ s, rb }: { s: PlanProfila["sipke"][number]; rb: number }) {
         <tbody>
           {tabela.map((g, i) => (
             <tr key={i} className="border-t border-line">
-              <td className="py-1 pr-3 font-mono font-bold">{g.mera.toLocaleString("sr-RS")} mm</td>
+              <td className="py-1 pr-3 tabular-nums font-bold">{g.mera.toLocaleString("sr-RS")} mm</td>
               <td className="py-1 pr-3 font-bold" style={{ color: g.ugao === "45" ? PLAVA : ZELENA }}>{g.ugao === "45" ? "45° kosi" : "90° ravno"}</td>
-              <td className="py-1 pr-3 text-right font-mono font-bold">{g.kom}</td>
+              <td className="py-1 pr-3 text-right tabular-nums font-bold">{g.kom}</td>
               <td className="py-1 pl-3 text-brand">{g.poz.join(", ")}</td>
             </tr>
           ))}
@@ -175,7 +175,7 @@ export default async function KrojnaLista({ params }: { params: Promise<{ id: st
           <header className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-brand pb-4">
             <div>
               <p className="text-2xl font-extrabold tracking-tight">OPTIMIZACIJA SEČENJA</p>
-              <p className="mt-1 text-sm">Nalog: <b className="font-mono">{ponuda.broj}</b> · Kupac: <b>{ponuda.klijent.naziv}</b></p>
+              <p className="mt-1 text-sm">Nalog: <b className="tabular-nums">{ponuda.broj}</b> · Kupac: <b>{ponuda.klijent.naziv}</b></p>
             </div>
             <div className="flex gap-6 text-right text-sm">
               <div><p className="text-2xl font-extrabold text-brand">{ukupnoNovih}</p><p className="text-xs text-muted">novih šipki</p></div>
@@ -231,7 +231,7 @@ export default async function KrojnaLista({ params }: { params: Promise<{ id: st
             </p>
             <ul className="mt-1 grid gap-x-6 sm:grid-cols-2">
               {KODOVI.map(([k, o]) => (
-                <li key={k}><b className="font-mono text-foreground">{k}</b> – {o}</li>
+                <li key={k}><b className="tabular-nums text-foreground">{k}</b> – {o}</li>
               ))}
             </ul>
             <p className="mt-2">Na novoj šipki se odseca {POCETNI_ODSECAK} mm, a za svaki rez se računa {REZ} mm. Sistem prvo koristi ostatke iz magacina duže od {MIN_OSTATAK} mm; posle knjiženja novi ostaci duži od {MIN_OSTATAK} mm se vraćaju u magacin. Knjiženje je moguće samo jednom po nalogu.</p>
